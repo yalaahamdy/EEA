@@ -7,9 +7,9 @@
 import { createAudioCtx, playFlip, playMatch, playSuccessChime, playFailBuzz } from './gameAudio.js';
 
 const DIFFICULTY = {
-  easy:   { pairs: 6,  cols: 4, label: 'Easy (12 cards)' },
-  medium: { pairs: 10, cols: 5, label: 'Medium (20 cards)' },
-  hard:   { pairs: 15, cols: 6, label: 'Hard (30 cards)' },
+  easy:   { pairs: 6,  cols: 4, previewTime: 4, label: 'Easy (12 cards)' },
+  medium: { pairs: 8,  cols: 4, previewTime: 3, label: 'Medium (16 cards)' },
+  hard:   { pairs: 12, cols: 6, previewTime: 1, label: 'Hard (24 cards)' },
 };
 
 const BEST_TIME_KEY = 'eea_memory_best';
@@ -40,65 +40,91 @@ function buildCards(pool, numPairs) {
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-export function playMemoryMatch(mount, { vocabPool, onWin }) {
-  if (!vocabPool || vocabPool.length < 6) {
-    mount.innerHTML = `<div class="gc-error">⚠️ Not enough vocabulary. Complete more lessons first!</div>`;
-    return;
-  }
-  showDifficultyScreen(mount, vocabPool, onWin);
-}
+export function playMemoryMatch(mount, { vocabPool, onWin, difficulty }) {
+  const diff = difficulty || 'medium';
+  const cfg = DIFFICULTY[diff];
+  const reqPairs = cfg.pairs;
 
-// ─── Difficulty selector ──────────────────────────────────────────────────────
-function showDifficultyScreen(mount, pool, onWin) {
-  const best = getBestTimes();
-  mount.innerHTML = `
-    <div class="mm-difficulty-screen">
-      <div class="mm-diff-header">
-        <div class="mm-diff-icon">🎴</div>
-        <h2>Memory Match</h2>
-        <p>Match each English word with its Arabic translation. Flip two cards at a time!</p>
-      </div>
-      <div class="mm-diff-cards">
-        ${Object.entries(DIFFICULTY).map(([key, cfg]) => `
-          <button class="mm-diff-btn" data-diff="${key}">
-            <span class="mm-diff-label">${cfg.label}</span>
-            ${best[key] ? `<span class="mm-diff-best">🏆 Best: ${formatTime(best[key])}</span>` : '<span class="mm-diff-best">No record yet</span>'}
-          </button>
-        `).join('')}
-      </div>
-    </div>
-  `;
-  mount.querySelectorAll('.mm-diff-btn').forEach(btn => {
-    btn.addEventListener('click', () => startGame(mount, pool, onWin, btn.dataset.diff));
-  });
+  if (!vocabPool || vocabPool.length < reqPairs) {
+    const availablePairs = Math.floor(vocabPool.length);
+    if (availablePairs < 4) {
+      mount.innerHTML = `
+        <div class="gc-error" style="font-family:'Tajawal',sans-serif">
+          ⚠️ عدد المفردات في الدروس المحددة قليل جداً (أقل من 4 كلمات). الرجاء اختيار دروس إضافية للعب Memory Match.
+        </div>`;
+      return;
+    }
+  }
+
+  startGame(mount, vocabPool, onWin, diff);
 }
 
 // ─── Start game ───────────────────────────────────────────────────────────────
 function startGame(mount, pool, onWin, difficulty) {
   const cfg = DIFFICULTY[difficulty];
   const maxPairs = Math.min(cfg.pairs, Math.floor(pool.length));
+  
   mm = {
     cards: buildCards(pool, maxPairs),
     flipped: [],
     matched: 0,
     totalPairs: maxPairs,
     moves: 0,
-    locked: false,
+    locked: true, // start locked for preview
     timer: 0,
     timerInterval: null,
     difficulty,
-    cols: cfg.cols,
+    cols: maxPairs <= 6 ? 4 : cfg.cols,
     combo: 0,
     score: 0,
+    previewCount: cfg.previewTime,
     startTime: Date.now(),
   };
 
-  renderGame(mount, pool, onWin);
+  // Set all cards to flipped for preview
+  mm.cards.forEach(c => c.flipped = true);
 
-  mm.timerInterval = setInterval(() => {
-    mm.timer++;
-    const el = document.getElementById('mm-timer');
-    if (el) el.textContent = formatTime(mm.timer);
+  renderGame(mount, pool, onWin);
+  runPreviewCountdown(mount, pool, onWin);
+}
+
+function runPreviewCountdown(mount, pool, onWin) {
+  const overlay = document.getElementById('mm-preview-overlay');
+  if (!overlay) return;
+
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `
+    <div class="mm-preview-card" style="font-family:'Tajawal',sans-serif">
+      <h3>تجهّز! Memorize</h3>
+      <div class="mm-preview-num" id="mm-preview-num">${mm.previewCount}</div>
+      <p>احفظ أماكن الكلمات قبل تغطيتها!</p>
+    </div>
+  `;
+
+  const interval = setInterval(() => {
+    mm.previewCount--;
+    const numEl = document.getElementById('mm-preview-num');
+    if (numEl) numEl.textContent = mm.previewCount;
+
+    if (mm.previewCount <= 0) {
+      clearInterval(interval);
+      overlay.style.display = 'none';
+      
+      // Flip cards back down
+      mm.cards.forEach(c => {
+        c.flipped = false;
+        const el = mount.querySelector(`[data-id="${c.id}"]`);
+        if (el) el.classList.remove('flipped');
+      });
+
+      // Unlock game and start timer
+      mm.locked = false;
+      mm.timerInterval = setInterval(() => {
+        mm.timer++;
+        const el = document.getElementById('mm-timer');
+        if (el) el.textContent = formatTime(mm.timer);
+      }, 1000);
+    }
   }, 1000);
 }
 
@@ -106,25 +132,25 @@ function startGame(mount, pool, onWin, difficulty) {
 function renderGame(mount, pool, onWin) {
   mount.innerHTML = `
     <div class="mm-root" id="mm-root">
-      <div class="mm-hud">
+      <div class="mm-hud" style="font-family:'Tajawal',sans-serif">
         <div class="mm-hud-item">
-          <span class="mm-hud-label">Time</span>
+          <span class="mm-hud-label">الوقت</span>
           <span class="mm-hud-val" id="mm-timer">0:00</span>
         </div>
         <div class="mm-hud-item">
-          <span class="mm-hud-label">Moves</span>
+          <span class="mm-hud-label">المحاولات</span>
           <span class="mm-hud-val" id="mm-moves">0</span>
         </div>
         <div class="mm-hud-item">
-          <span class="mm-hud-label">Pairs</span>
+          <span class="mm-hud-label">الأزواج</span>
           <span class="mm-hud-val" id="mm-pairs">${mm.matched}/${mm.totalPairs}</span>
         </div>
         <div class="mm-hud-item">
-          <span class="mm-hud-label">Combo</span>
+          <span class="mm-hud-label">المضاعف</span>
           <span class="mm-hud-val combo" id="mm-combo">x${mm.combo + 1}</span>
         </div>
         <div class="mm-hud-item">
-          <span class="mm-hud-label">Score</span>
+          <span class="mm-hud-label">النقاط</span>
           <span class="mm-hud-val score" id="mm-score">${mm.score}</span>
         </div>
       </div>
@@ -134,12 +160,18 @@ function renderGame(mount, pool, onWin) {
         ${mm.cards.map(card => renderCard(card)).join('')}
       </div>
 
+      <!-- Preview overlay -->
+      <div class="mm-preview-overlay" id="mm-preview-overlay" style="display:none"></div>
+
+      <!-- Win overlay -->
       <div class="mm-overlay" id="mm-overlay" style="display:none"></div>
     </div>
   `;
 
   mount.querySelectorAll('.mm-card').forEach(el => {
-    el.addEventListener('click', () => handleCardClick(parseInt(el.dataset.id), mount, pool, onWin));
+    el.addEventListener('click', () => {
+      handleCardClick(parseInt(el.dataset.id), mount, pool, onWin);
+    });
   });
 }
 
@@ -155,11 +187,11 @@ function renderCard(card) {
     <div class="${cls}" data-id="${card.id}" data-pair="${card.pairId}">
       <div class="mm-card-inner">
         <div class="mm-card-front">
-          <span class="mm-card-front-icon">${card.type === 'en' ? '🔤' : '📖'}</span>
+          <span class="mm-card-front-icon">${card.type === 'en' ? '🇬🇧' : '🇪🇬'}</span>
         </div>
         <div class="mm-card-back">
           <span class="mm-card-text">${card.text}</span>
-          <span class="mm-card-lang">${card.type === 'en' ? 'English' : 'Arabic'}</span>
+          <span class="mm-card-lang">${card.type === 'en' ? 'English' : 'العربية'}</span>
         </div>
       </div>
     </div>
@@ -179,18 +211,17 @@ function handleCardClick(cardId, mount, pool, onWin) {
   card.flipped = true;
   mm.flipped.push(card);
 
-  // Animate flip
   const el = mount.querySelector(`[data-id="${cardId}"]`);
   if (el) el.classList.add('flipped');
 
   if (mm.flipped.length === 2) {
     mm.moves++;
-    document.getElementById('mm-moves').textContent = mm.moves;
+    const movesEl = document.getElementById('mm-moves');
+    if (movesEl) movesEl.textContent = mm.moves;
     mm.locked = true;
 
     const [a, b] = mm.flipped;
     if (a.pairId === b.pairId && a.type !== b.type) {
-      // Match!
       setTimeout(() => {
         playMatch();
         [a, b].forEach(c => {
@@ -203,9 +234,12 @@ function handleCardClick(cardId, mount, pool, onWin) {
         const comboMult = Math.min(5, mm.combo);
         mm.score += 100 * comboMult;
 
-        document.getElementById('mm-combo').textContent = `x${mm.combo + 1}`;
-        document.getElementById('mm-pairs').textContent = `${mm.matched}/${mm.totalPairs}`;
-        document.getElementById('mm-score').textContent = mm.score;
+        const comboEl = document.getElementById('mm-combo');
+        const pairsEl = document.getElementById('mm-pairs');
+        const scoreEl = document.getElementById('mm-score');
+        if (comboEl) comboEl.textContent = `x${mm.combo + 1}`;
+        if (pairsEl) pairsEl.textContent = `${mm.matched}/${mm.totalPairs}`;
+        if (scoreEl) scoreEl.textContent = mm.score;
 
         mm.flipped = [];
         mm.locked = false;
@@ -218,11 +252,11 @@ function handleCardClick(cardId, mount, pool, onWin) {
         }
       }, 300);
     } else {
-      // No match
       setTimeout(() => {
         playFailBuzz();
         mm.combo = 0;
-        document.getElementById('mm-combo').textContent = `x1`;
+        const comboEl = document.getElementById('mm-combo');
+        if (comboEl) comboEl.textContent = `x1`;
         [a, b].forEach(c => {
           c.flipped = false;
           const el2 = mount.querySelector(`[data-id="${c.id}"]`);
@@ -242,30 +276,30 @@ function showWinScreen(mount, pool, onWin) {
 
   const best = getBestTimes()[mm.difficulty];
   const isNewRecord = best === mm.timer;
-  const efficiency = Math.max(0, Math.round(100 - (mm.moves - mm.totalPairs) * 3));
+  const efficiency = Math.max(0, Math.round(100 - (mm.moves - mm.totalPairs) * 4));
 
   const overlay = document.getElementById('mm-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
   overlay.innerHTML = `
-    <div class="hm-result-card hm-win-card">
+    <div class="hm-result-card hm-win-card" style="font-family:'Tajawal',sans-serif">
       <div class="hm-result-icon">${isNewRecord ? '🏆' : '🎉'}</div>
-      <h2 class="hm-result-title">${isNewRecord ? 'New Record!' : 'Board Cleared!'}</h2>
+      <h2 class="hm-result-title" style="font-family:'Outfit',sans-serif">${isNewRecord ? 'رقم قياسي جديد!' : 'تم مسح اللوحة!'}</h2>
       <div class="hm-result-scores">
-        <div class="hm-rscore-item"><span>Time</span><strong>${formatTime(mm.timer)}</strong></div>
-        <div class="hm-rscore-item"><span>Moves</span><strong>${mm.moves}</strong></div>
-        <div class="hm-rscore-item"><span>Efficiency</span><strong>${efficiency}%</strong></div>
-        <div class="hm-rscore-item accent"><span>Score</span><strong>${mm.score} pts</strong></div>
+        <div class="hm-rscore-item"><span>الوقت المستغرق</span><strong>${formatTime(mm.timer)}</strong></div>
+        <div class="hm-rscore-item"><span>عدد الحركات</span><strong>${mm.moves}</strong></div>
+        <div class="hm-rscore-item"><span>الدقة (Accuracy)</span><strong>${efficiency}%</strong></div>
+        <div class="hm-rscore-item accent"><span>النقاط</span><strong>${mm.score}</strong></div>
       </div>
       <div class="hm-result-actions">
-        <button class="gc-launch-btn" id="mm-replay-btn">Play Again</button>
-        <button class="gc-back-small-btn" id="mm-diff-btn">Change Difficulty</button>
+        <button class="gc-launch-btn" id="mm-replay-btn">العب مجدداً ⚡</button>
+        <button class="gc-back-small-btn" id="mm-hub-btn">رجوع للألعاب</button>
       </div>
     </div>
   `;
 
   overlay.querySelector('#mm-replay-btn').addEventListener('click', () => startGame(mount, pool, onWin, mm.difficulty));
-  overlay.querySelector('#mm-diff-btn').addEventListener('click', () => showDifficultyScreen(mount, pool, onWin));
+  overlay.querySelector('#mm-hub-btn').addEventListener('click', () => document.querySelector('#gc-back-btn')?.click());
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

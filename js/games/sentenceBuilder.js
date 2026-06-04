@@ -7,37 +7,64 @@
 import { createAudioCtx, playClick, playSuccessChime, playFailBuzz, playTone } from './gameAudio.js';
 
 const ROUNDS = 6;
-const TIME_PER_SENTENCE = 30;
 
 let sb = {};
 
-// ─── Fallback sentence pool if dialogue pool is small ─────────────────────────
 const FALLBACK_SENTENCES = [
-  { sentence: 'She is reading a very good book' },
-  { sentence: 'I would like to order some coffee' },
-  { sentence: 'The weather today is quite beautiful' },
-  { sentence: 'Can you help me find the library' },
-  { sentence: 'He speaks English very fluently' },
-  { sentence: 'We are going to the market tomorrow' },
-  { sentence: 'They finished their homework before dinner' },
-  { sentence: 'My sister works at a big hospital' },
+  { sentence: 'She is reading a very good book', tip: 'الصفة (good) تسبق الاسم الموصوف (book) دائماً في اللغة الإنجليزية.' },
+  { sentence: 'I would like to order some coffee', tip: 'التعبير (would like) طريقة مهذبة للغاية لطلب الأشياء وتعني (أود أن).' },
+  { sentence: 'The weather today is quite beautiful', tip: 'نضع الفعل المساعد (is) قبل الصفة (beautiful) لربط الجملة الاسمية.' },
+  { sentence: 'Can you help me find the library', tip: 'السؤال بـ (Can you) هو الأسلوب الشائع لطلب المساعدة من الآخرين بطريقة ودية.' },
+  { sentence: 'He speaks English very fluently', tip: 'الحال (fluently) ينتهي بـ ly ويأتي بعد الفعل ليصف طريقة التحدث.' },
+  { sentence: 'We are going to the market tomorrow', tip: 'التركيب (are going to) يستخدم للتعبير عن ترتيبات وخطط مستقبلية مؤكدة.' },
+  { sentence: 'They finished their homework before dinner', tip: 'الفعل (finished) في الماضي البسيط يعبر عن حدث انتهى تماماً في الماضي.' },
+  { sentence: 'My sister works at a big hospital', tip: 'حرف الجر (at) يستخدم للتعبير عن التواجد داخل مؤسسة أو مكان عمل محدد.' },
 ];
 
-// ─── Public API ────────────────────────────────────────────────────────────────
-export function playSentenceBuilder(mount, { sentencePool, onWin }) {
+function getGrammarTip(sentence) {
+  const lower = sentence.toLowerCase();
+  if (lower.includes('is reading') || lower.includes('are going') || lower.includes('is working')) {
+    return 'ملاحظة قواعدية: زمن المضارع المستمر (Verb + ing) يعبر عن حدث مستمر يقع الآن.';
+  }
+  if (lower.includes('would like')) {
+    return 'ملاحظة قواعدية: التركيب (would like) يستخدم لطلب الأشياء بأدب ورقي.';
+  }
+  if (lower.includes('yesterday') || lower.includes('last week') || lower.endsWith('ed')) {
+    return 'ملاحظة قواعدية: زمن الماضي البسيط يعبر عن حدث بدأ وانتهى في الماضي.';
+  }
+  if (lower.includes('can you')) {
+    return 'ملاحظة قواعدية: التركيب (Can you...) يستخدم لطلب المساعدة بشكل مهذب.';
+  }
+  if (lower.includes('want to')) {
+    return 'ملاحظة قواعدية: الفعل (want) يتبعه دائماً حرف الجر to ثم الفعل في المصدر (want to do).';
+  }
+  return 'ملاحظة قواعدية: ترتيب الجملة الإنجليزية يبدأ بالفاعل (Subject) ثم الفعل (Verb) ثم المفعول أو التكملة.';
+}
+
+export function playSentenceBuilder(mount, { sentencePool, onWin, difficulty }) {
+  const diff = difficulty || 'medium';
   let pool = (sentencePool || []).filter(s => {
     const words = s.sentence.replace(/[^a-zA-Z\s]/g, '').trim().split(/\s+/);
     return words.length >= 4 && words.length <= 10;
   });
 
   if (pool.length < ROUNDS) pool = [...pool, ...FALLBACK_SENTENCES];
+  
+  pool.forEach(item => {
+    if (!item.tip) {
+      item.tip = getGrammarTip(item.sentence);
+    }
+  });
+
   pool = pool.sort(() => Math.random() - 0.5);
 
-  startGame(mount, pool, onWin);
+  startGame(mount, pool, onWin, diff);
 }
 
-// ─── Start ─────────────────────────────────────────────────────────────────────
-function startGame(mount, pool, onWin) {
+function startGame(mount, pool, onWin, difficulty) {
+  const times = { easy: 45, medium: 30, hard: 18 };
+  const timePerSentence = times[difficulty] || 30;
+
   sb = {
     pool,
     rounds: pool.slice(0, ROUNDS),
@@ -45,14 +72,15 @@ function startGame(mount, pool, onWin) {
     score: 0,
     streak: 0,
     onWin,
+    timePerSentence,
+    timeLeft: timePerSentence,
     timerInterval: null,
-    timeLeft: TIME_PER_SENTENCE,
     answered: false,
+    difficulty,
   };
   nextRound(mount);
 }
 
-// ─── Round ─────────────────────────────────────────────────────────────────────
 function nextRound(mount) {
   clearInterval(sb.timerInterval);
   if (sb.round >= ROUNDS) { showResults(mount); return; }
@@ -62,7 +90,6 @@ function nextRound(mount) {
   const words = cleaned.split(/\s+/).filter(Boolean);
   const shuffled = [...words].sort(() => Math.random() - 0.5);
 
-  // Ensure shuffled ≠ original
   let attempts = 0;
   let sh = shuffled;
   while (sh.join(' ') === words.join(' ') && attempts < 10) {
@@ -70,61 +97,61 @@ function nextRound(mount) {
     attempts++;
   }
 
-  sb.current = { words, shuffled: sh, answer: [] };
+  sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence };
   sb.answered = false;
-  sb.timeLeft = TIME_PER_SENTENCE;
+  sb.timeLeft = sb.timePerSentence;
 
   renderRound(mount);
   startTimer(mount);
 }
 
-// ─── Render ────────────────────────────────────────────────────────────────────
 function renderRound(mount) {
   const progress = (sb.round / ROUNDS) * 100;
+  const isEasy = sb.difficulty === 'easy';
 
   mount.innerHTML = `
     <div class="sbn-root" id="sbn-root">
-
-      <!-- HUD -->
-      <div class="sbn-hud">
+      <div class="sbn-hud" style="font-family:'Tajawal',sans-serif">
         <div class="sbn-hud-item">
-          <span>Sentence</span><strong>${sb.round + 1}/${ROUNDS}</strong>
+          <span>الجملة</span><strong>${sb.round + 1}/${ROUNDS}</strong>
         </div>
         <div class="sbn-hud-item">
-          <span>Score</span><strong id="sbn-score">${sb.score}</strong>
+          <span>النقاط</span><strong id="sbn-score">${sb.score}</strong>
         </div>
         <div class="sbn-hud-item">
-          <span>Streak 🔥</span><strong id="sbn-streak">${sb.streak}</strong>
+          <span>المتتالي 🔥</span><strong id="sbn-streak">${sb.streak}</strong>
         </div>
         <div class="sbn-hud-item">
-          <span>Time</span><strong id="sbn-timer">${sb.timeLeft}s</strong>
+          <span>الوقت المتبقي</span><strong id="sbn-timer">${sb.timeLeft}s</strong>
         </div>
       </div>
 
-      <!-- Progress bar -->
       <div class="wsc-progress-wrap">
         <div class="wsc-progress-fill" style="width:${progress}%"></div>
       </div>
 
-      <!-- Timer bar -->
       <div class="wsc-timer-row">
         <div class="wsc-timer-track">
           <div class="wsc-timer-bar" id="sbn-timer-bar"
-               style="width:100%;transition:width ${TIME_PER_SENTENCE}s linear;background:var(--primary)"></div>
+               style="width:100%;transition:width ${sb.timePerSentence}s linear;background:var(--primary)"></div>
         </div>
       </div>
 
-      <!-- Instruction -->
-      <div class="sbn-instruction">
-        <p>🧩 Tap the words below in the correct order to build a proper English sentence.</p>
+      <div class="sbn-instruction" style="font-family:'Tajawal',sans-serif">
+        <p>🧩 انقر على الكلمات المبعثرة بالترتيب الصحيح لتكوين الجملة الإنجليزية المطلوبة:</p>
       </div>
 
-      <!-- Answer area -->
+      ${(isEasy && sb.current.tip) ? `
+        <div class="sbn-translation-hint" style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:12px; margin-bottom:12px; font-family:'Tajawal',sans-serif; text-align:right; font-size:0.87rem; color:var(--success);">
+          💡 تلميح قواعدي للمساعدة: <strong>${sb.current.tip}</strong>
+        </div>
+      ` : ''}
+
       <div class="sbn-answer-area" id="sbn-answer-area">
-        <div class="sbn-answer-label">Your sentence:</div>
+        <div class="sbn-answer-label">جملتك الحالية:</div>
         <div class="sbn-answer-slots" id="sbn-answer-slots">
           ${sb.current.answer.length === 0
-            ? '<span class="sbn-placeholder">Tap words below to start building...</span>'
+            ? '<span class="sbn-placeholder">انقر على الكلمات بالأسفل لبناء الجملة...</span>'
             : sb.current.answer.map((w, i) => `
                 <button class="sbn-answer-word" data-answer-idx="${i}">${w}
                   <span class="sbn-remove-hint">✕</span>
@@ -134,7 +161,6 @@ function renderRound(mount) {
         </div>
       </div>
 
-      <!-- Word pool -->
       <div class="sbn-word-pool" id="sbn-word-pool">
         ${sb.current.shuffled.map((w, i) => {
           const used = sb.current.answer.filter(a => a === w).length >
@@ -150,17 +176,15 @@ function renderRound(mount) {
         }).join('')}
       </div>
 
-      <!-- Actions -->
-      <div class="wsc-actions">
-        <button class="wsc-action-btn wsc-clear-btn" id="sbn-clear">⌫ Clear</button>
-        <button class="wsc-action-btn wsc-submit-btn" id="sbn-submit">✓ Submit</button>
+      <div class="wsc-actions" style="font-family:'Tajawal',sans-serif">
+        <button class="wsc-action-btn wsc-clear-btn" id="sbn-clear">⌫ مسح الجملة</button>
+        <button class="wsc-action-btn wsc-submit-btn" id="sbn-submit">✓ تحقق من الحل</button>
       </div>
 
       <div class="wsc-feedback" id="sbn-feedback"></div>
     </div>
   `;
 
-  // Kick timer bar
   requestAnimationFrame(() => {
     const bar = document.getElementById('sbn-timer-bar');
     if (bar) bar.style.width = '0%';
@@ -169,7 +193,6 @@ function renderRound(mount) {
   attachSBListeners(mount);
 }
 
-// ─── Listeners ─────────────────────────────────────────────────────────────────
 function attachSBListeners(mount) {
   mount.querySelectorAll('.sbn-word-tile').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -188,7 +211,6 @@ function attachSBListeners(mount) {
   document.getElementById('sbn-clear')?.addEventListener('click', () => {
     sb.current.answer = [];
     renderRound(mount);
-    startTimer(mount);
   });
 
   document.getElementById('sbn-submit')?.addEventListener('click', () => submitAnswer(mount));
@@ -216,7 +238,7 @@ function refreshAnswerArea(mount) {
   const slots = document.getElementById('sbn-answer-slots');
   if (!slots) return;
   slots.innerHTML = sb.current.answer.length === 0
-    ? '<span class="sbn-placeholder">Tap words below to start building...</span>'
+    ? '<span class="sbn-placeholder">انقر على الكلمات بالأسفل لبناء الجملة...</span>'
     : sb.current.answer.map((w, i) => `
         <button class="sbn-answer-word" data-answer-idx="${i}">${w}
           <span class="sbn-remove-hint">✕</span>
@@ -248,7 +270,6 @@ function refreshWordPool(mount) {
   });
 }
 
-// ─── Submit ────────────────────────────────────────────────────────────────────
 function submitAnswer(mount) {
   if (sb.answered) return;
   clearInterval(sb.timerInterval);
@@ -266,21 +287,21 @@ function submitAnswer(mount) {
     const streakPts = Math.min(5, sb.streak) * 30;
     const pts       = 150 + timePts + streakPts;
     sb.score += pts;
-    showFeedback(mount, `✅ Perfect! +${pts} pts`, 'fb-correct');
+    
+    showFeedback(mount, `✅ ممتاز! +${pts} نقطة \n ${sb.current.tip}`, 'fb-correct');
   } else {
     playFailBuzz();
     sb.streak = 0;
-    showFeedback(mount, `❌ Correct: "${sb.current.words.join(' ')}"`, 'fb-wrong');
+    showFeedback(mount, `❌ خاطئ! الحل: "${sb.current.words.join(' ')}" \n ${sb.current.tip}`, 'fb-wrong');
   }
 
   document.getElementById('sbn-score').textContent = sb.score;
   document.getElementById('sbn-streak').textContent = sb.streak;
 
   sb.round++;
-  setTimeout(() => nextRound(mount), 2000);
+  setTimeout(() => nextRound(mount), 3800);
 }
 
-// ─── Timer ─────────────────────────────────────────────────────────────────────
 function startTimer(mount) {
   clearInterval(sb.timerInterval);
   sb.timerInterval = setInterval(() => {
@@ -293,19 +314,23 @@ function startTimer(mount) {
       sb.answered = true;
       sb.streak = 0;
       playFailBuzz();
-      showFeedback(mount, `⏱ Time's up! Answer: "${sb.current.words.join(' ')}"`, 'fb-wrong');
+      showFeedback(mount, `⏱ انتهى الوقت! الحل: "${sb.current.words.join(' ')}" \n ${sb.current.tip}`, 'fb-wrong');
       sb.round++;
-      setTimeout(() => nextRound(mount), 2000);
+      setTimeout(() => nextRound(mount), 3800);
     }
   }, 1000);
 }
 
 function showFeedback(mount, msg, cls) {
   const fb = document.getElementById('sbn-feedback');
-  if (fb) { fb.textContent = msg; fb.className = `wsc-feedback ${cls}`; }
+  if (fb) {
+    fb.innerHTML = msg.replace(/\n/g, '<br/>');
+    fb.className = `wsc-feedback ${cls}`;
+    fb.style.fontFamily = "'Tajawal', sans-serif";
+    fb.style.lineHeight = "1.6";
+  }
 }
 
-// ─── Results ───────────────────────────────────────────────────────────────────
 function showResults(mount) {
   clearInterval(sb.timerInterval);
   playSuccessChime();
@@ -313,21 +338,21 @@ function showResults(mount) {
   spawnConfetti(mount);
 
   mount.innerHTML = `
-    <div class="sp-results">
+    <div class="sp-results" style="font-family:'Tajawal',sans-serif">
       <div class="sp-results-grade" style="color:#0ea5e9;border-color:#0ea5e9">🧩</div>
-      <h2>Sentence Builder Complete!</h2>
+      <h2>اكتمل بناء الجمل! Complete</h2>
       <div class="sp-results-grid">
-        <div class="sp-result-item"><span>Final Score</span><strong>${sb.score} pts</strong></div>
-        <div class="sp-result-item"><span>Sentences</span><strong>${ROUNDS}</strong></div>
-        <div class="sp-result-item"><span>Best Streak</span><strong>🔥 ${sb.streak}</strong></div>
+        <div class="sp-result-item"><span>النقاط النهائية</span><strong>${sb.score}</strong></div>
+        <div class="sp-result-item"><span>عدد الجمل</span><strong>${ROUNDS}</strong></div>
+        <div class="sp-result-item"><span>أعلى متتالي</span><strong>🔥 ${sb.streak}</strong></div>
       </div>
       <div class="hm-result-actions">
-        <button class="gc-launch-btn" id="sbn-replay">Play Again</button>
-        <button class="gc-back-small-btn" id="sbn-hub">Back to Games</button>
+        <button class="gc-launch-btn" id="sbn-replay">العب مجدداً ⚡</button>
+        <button class="gc-back-small-btn" id="sbn-hub">رجوع للألعاب</button>
       </div>
     </div>
   `;
-  mount.querySelector('#sbn-replay').addEventListener('click', () => startGame(mount, sb.pool, sb.onWin));
+  mount.querySelector('#sbn-replay').addEventListener('click', () => startGame(mount, sb.pool, sb.onWin, sb.difficulty));
   mount.querySelector('#sbn-hub').addEventListener('click', () => document.querySelector('#gc-back-btn')?.click());
 }
 
