@@ -33,7 +33,12 @@ export function buildVocabPool() {
   const pool = [];
   (levelData.curriculum || []).forEach(lesson => {
     (lesson.vocabulary || []).forEach(v => {
-      if (v.english && v.arabic) pool.push({ english: v.english, arabic: v.arabic, lessonId: lesson.id });
+      // Support both field name conventions
+      const english = v.word || v.english;
+      const arabic  = v.translation || v.arabic;
+      if (english && arabic) {
+        pool.push({ english, arabic, lessonId: lesson.id });
+      }
     });
   });
   return pool;
@@ -43,23 +48,24 @@ export function buildVocabPool() {
 export function buildSentencePool() {
   const pool = [];
   (levelData.curriculum || []).forEach(lesson => {
-    if (lesson.dialogue && lesson.dialogue.lines) {
-      lesson.dialogue.lines.forEach(line => {
-        if (line.english && line.english.split(' ').length >= 4) {
-          pool.push({ sentence: line.english, lessonId: lesson.id });
-        }
-      });
-    }
-    if (lesson.practice && lesson.practice.exercises) {
-      lesson.practice.exercises.forEach(ex => {
-        if (ex.sentence && ex.sentence.split(' ').length >= 4) {
-          pool.push({ sentence: ex.sentence, lessonId: lesson.id });
-        }
-        if (ex.question && ex.question.split(' ').length >= 4) {
-          pool.push({ sentence: ex.question, lessonId: lesson.id });
-        }
-      });
-    }
+    // dialogue.lines or dialogue.exchanges
+    const dialogueLines = lesson.dialogue?.lines || lesson.dialogue?.exchanges || [];
+    dialogueLines.forEach(line => {
+      const text = line.english || line.en || line.line;
+      if (text && text.split(' ').length >= 4) {
+        pool.push({ sentence: text, lessonId: lesson.id });
+      }
+    });
+    // practice exercises
+    const exercises = lesson.practice?.exercises || [];
+    exercises.forEach(ex => {
+      if (ex.sentence && ex.sentence.split(' ').length >= 4) {
+        pool.push({ sentence: ex.sentence, lessonId: lesson.id });
+      }
+      if (ex.question && ex.question.split(' ').length >= 4) {
+        pool.push({ sentence: ex.question, lessonId: lesson.id });
+      }
+    });
   });
   return pool;
 }

@@ -381,7 +381,14 @@ function verifySpellingAnswer() {
 
   } else {
     sfx.playIncorrect();
-    const hint = getSpellingFeedback(cleanInput, cleanTarget);
+    // For long words (>5 chars): don't pinpoint a single letter, just encourage retry
+    const isLongWord = cleanTarget.replace(/\s/g, '').length > 5;
+    let hint;
+    if (isLongWord) {
+      hint = `الكلمة الصح هي "${v.word}" — راجعها وجرب تاني!`;
+    } else {
+      hint = getSpellingFeedback(cleanInput, cleanTarget);
+    }
     feedbackEl.className = "practice-feedback-bar incorrect";
     feedbackEl.innerHTML = `
       <h4 class="feedback-title-incorrect">Incorrect Spelling! Try Again</h4>
