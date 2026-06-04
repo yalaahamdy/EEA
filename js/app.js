@@ -13,6 +13,7 @@ import { renderDictionary } from './components/dictionary.js';
 import { initReviewCenter } from './components/reviewCenter.js';
 import { initLevelManager, levelData } from './levelManager.js';
 import { initSettingsController } from './settingsController.js';
+import { initGameCenter } from './components/gameCenter.js';
 
 // Router Map matching hashes to section DOM IDs
 const ROUTES = {
@@ -22,7 +23,8 @@ const ROUTES = {
   'vocab-center': 'vocab-center-section',
   'dictionary': 'dictionary-section',
   'final-test': 'final-test-section',
-  'review-center': 'review-center-section'
+  'review-center': 'review-center-section',
+  'game-center': 'game-center-section'
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -188,6 +190,9 @@ function handleRouting() {
       break;
     case 'review-center':
       initReviewCenter();
+      break;
+    case 'game-center':
+      initGameCenter(params);
       break;
   }
 
