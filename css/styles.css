@@ -6418,6 +6418,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   padding: 6px;
   border-radius: 12px;
   border: 1px solid var(--border-color);
+  overflow-x: scroll;
 }
 .gc-setup-tab {
   flex: 1;
