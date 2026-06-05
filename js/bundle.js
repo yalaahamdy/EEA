@@ -23681,6 +23681,32 @@
     }
     .sb-notify-bar.correct { color: var(--success); }
     .sb-notify-bar.wrong { color: var(--error); }
+
+    /* \u0632\u0631 \u0627\u0644\u062A\u0644\u0645\u064A\u062D \u0627\u0644\u0641\u062E\u0645 \u0644\u0644\u062A\u0631\u062C\u0645\u0629 */
+    .sb-hint-action-btn {
+      width: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 auto;
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--surface-gradient), var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      font-family: 'Tajawal', sans-serif;
+    }
+    .sb-hint-action-btn:hover {
+      color: var(--text-main);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+      transform: translateY(-2px);
+    }
   `;
     document.head.appendChild(styleEl);
   }
@@ -23782,6 +23808,97 @@
     }
     return "\u062A\u0623\u0645\u0644 \u062A\u0631\u062A\u064A\u0628 \u0627\u0644\u0643\u0644\u0645\u0627\u062A \u062C\u064A\u062F\u0627\u064B: \u0646\u0628\u062F\u0623 \u0628\u0627\u0644\u0641\u0627\u0639\u0644 (Subject) \u062B\u0645 \u0627\u0644\u0641\u0639\u0644 (Verb) \u062B\u0645 \u0627\u0644\u0645\u0641\u0639\u0648\u0644 (Object) \u0623\u0648 \u0628\u0627\u0642\u064A \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u062C\u0645\u0644\u0629.";
   }
+  function getSmartTranslation(item) {
+    if (item.translation && item.translation.trim() !== "" && item.translation !== "\u062A\u0631\u062C\u0645\u0629 \u063A\u064A\u0631 \u0645\u062A\u0648\u0641\u0631\u0629") {
+      return item.translation;
+    }
+    const sentence = item.sentence || "";
+    const cleanNorm = sentence.toLowerCase().replace(/[.?!,]/g, "").replace(/\s+/g, " ").trim();
+    const sentenceDict = {
+      "what is your daily routine": "\u0645\u0627 \u0647\u0648 \u0631\u0648\u062A\u064A\u0646\u0643 \u0627\u0644\u064A\u0648\u0645\u064A \u0627\u0644\u0645\u0639\u062A\u0627\u062F\u061F",
+      "what is your daily routine like sarah": "\u0643\u064A\u0641 \u064A\u0628\u062F\u0648 \u0631\u0648\u062A\u064A\u0646\u0643 \u0627\u0644\u064A\u0648\u0645\u064A \u064A\u0627 \u0633\u0627\u0631\u0629\u061F",
+      "i always wake up early at six take a shower and eat breakfast": "\u0623\u0633\u062A\u064A\u0642\u0638 \u062F\u0627\u0626\u0645\u0627\u064B \u0645\u0628\u0643\u0631\u0627\u064B \u0641\u064A \u0627\u0644\u0633\u0627\u062F\u0633\u0629\u060C \u0622\u062E\u0630 \u062F\u0634\u0627\u064B\u060C \u0648\u0623\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0641\u0637\u0648\u0631.",
+      "do you commute to work by bus": "\u0647\u0644 \u062A\u0630\u0647\u0628 \u0625\u0644\u0649 \u0627\u0644\u0639\u0645\u0644 \u0628\u0627\u0644\u062D\u0627\u0641\u0644\u0629\u061F",
+      "no i usually walk i start work at eight and finish at four": "\u0644\u0627\u060C \u0623\u0646\u0627 \u0623\u0633\u064A\u0631 \u0639\u0627\u062F\u0629\u064B. \u0623\u0628\u062F\u0623 \u0627\u0644\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u062B\u0627\u0645\u0646\u0629 \u0648\u0623\u0646\u062A\u0647\u064A \u0641\u064A \u0627\u0644\u0631\u0627\u0628\u0639\u0629.",
+      "my daily routine is simple": "\u0631\u0648\u062A\u064A\u0646 \u062D\u064A\u0627\u062A\u064A \u0627\u0644\u064A\u0648\u0645\u064A \u0628\u0633\u064A\u0637.",
+      "i start work at eight": "\u0623\u0628\u062F\u0623 \u0627\u0644\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0633\u0627\u0639\u0629 \u0627\u0644\u062B\u0627\u0645\u0646\u0629.",
+      "i enjoy reading in my free time": "\u0623\u0633\u062A\u0645\u062A\u0639 \u0628\u0627\u0644\u0642\u0631\u0627\u0621\u0629 \u0641\u064A \u0648\u0642\u062A \u0641\u0631\u0627\u063A\u064A.",
+      "what are your hobbies": "\u0645\u0627 \u0647\u064A \u0647\u0648\u0627\u064A\u0627\u062A\u0643\u061F",
+      "music is my main interest": "\u0627\u0644\u0645\u0648\u0633\u064A\u0642\u0649 \u0647\u064A \u0627\u0647\u062A\u0645\u0627\u0645\u064A \u0627\u0644\u0623\u0633\u0627\u0633\u064A.",
+      "i enjoy swimming": "\u0623\u0633\u062A\u0645\u062A\u0639 \u0628\u0627\u0644\u0633\u0628\u0627\u062D\u0629.",
+      "i prefer tea to coffee": "\u0623\u0641\u0636\u0644 \u0627\u0644\u0634\u0627\u064A \u0639\u0644\u0649 \u0627\u0644\u0642\u0647\u0648\u0629.",
+      "i dislike loud noises": "\u0623\u0643\u0631\u0647 \u0627\u0644\u0623\u0635\u0648\u0627\u062A \u0627\u0644\u0635\u0627\u062E\u0628\u0629.",
+      "children play outside": "\u0627\u0644\u0623\u0637\u0641\u0627\u0644 \u064A\u0644\u0639\u0628\u0648\u0646 \u0641\u064A \u0627\u0644\u062E\u0627\u0631\u062C.",
+      "football is a popular sport": "\u0643\u0631\u0629 \u0627\u0644\u0642\u062F\u0645 \u0631\u064A\u0627\u0636\u0629 \u0634\u0639\u0628\u064A\u0629.",
+      "listen to the teacher": "\u0627\u0633\u062A\u0645\u0639 \u0625\u0644\u0649 \u0627\u0644\u0645\u0639\u0644\u0645.",
+      "she loves classical music": "\u0647\u064A \u062A\u062D\u0628 \u0627\u0644\u0645\u0648\u0633\u064A\u0642\u0649 \u0627\u0644\u0643\u0644\u0627\u0633\u064A\u0643\u064A\u0629.",
+      "where is the nearest station": "\u0623\u064A\u0646 \u062A\u0642\u0639 \u0623\u0642\u0631\u0628 \u0645\u062D\u0637\u0629\u061F",
+      "can you help me please": "\u0647\u0644 \u064A\u0645\u0643\u0646\u0643 \u0645\u0633\u0627\u0639\u062F\u062A\u064A \u0645\u0646 \u0641\u0636\u0644\u0643\u061F",
+      "i am sorry for the mistake": "\u0623\u0646\u0627 \u0622\u0633\u0641 \u0639\u0644\u0649 \u0627\u0644\u062E\u0637\u0623.",
+      "thank you very much for your help": "\u0634\u0643\u0631\u0627\u064B \u062C\u0632\u064A\u0644\u0627\u064B \u0639\u0644\u0649 \u0645\u0633\u0627\u0639\u062F\u062A\u0643.",
+      "nice to meet you": "\u0633\u0631\u0631\u062A \u0628\u0644\u0642\u0627\u0626\u0643.",
+      "how can i help you today": "\u0643\u064A\u0641 \u064A\u0645\u0643\u0646\u0646\u064A \u0645\u0633\u0627\u0639\u062F\u062A\u0643 \u0627\u0644\u064A\u0648\u0645\u061F",
+      "excuse me where is the library": "\u0645\u0639\u0630\u0631\u0629\u060C \u0623\u064A\u0646 \u062A\u0642\u0639 \u0627\u0644\u0645\u0643\u062A\u0628\u0629\u061F",
+      "it is a beautiful day today": "\u0625\u0646\u0647 \u064A\u0648\u0645 \u062C\u0645\u064A\u0644 \u0627\u0644\u064A\u0648\u0645.",
+      "she is reading a very good book": "\u0647\u064A \u062A\u0642\u0631\u0623 \u0643\u062A\u0627\u0628\u0627\u064B \u062C\u064A\u062F\u0627\u064B \u062C\u062F\u0627\u064B.",
+      "i would like to order some coffee": "\u0623\u0648\u062F \u0623\u0646 \u0623\u0637\u0644\u0628 \u0628\u0639\u0636 \u0627\u0644\u0642\u0647\u0648\u0629.",
+      "the weather today is quite beautiful": "\u0627\u0644\u0637\u0642\u0633 \u0627\u0644\u064A\u0648\u0645 \u062C\u0645\u064A\u0644 \u062A\u0645\u0627\u0645\u0627\u064B.",
+      "can you help me find the library": "\u0647\u0644 \u064A\u0645\u0643\u0646\u0643 \u0645\u0633\u0627\u0639\u062F\u062A\u064A \u0641\u064A \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0643\u062A\u0628\u0629\u061F",
+      "he speaks English very fluently": "\u0647\u0648 \u064A\u062A\u062D\u062F\u062B \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0628\u0637\u0644\u0627\u0642\u0629 \u0634\u062F\u064A\u062F\u0629.",
+      "we are going to the market tomorrow": "\u0646\u062D\u0646 \u0630\u0627\u0647\u0628\u0648\u0646 \u0625\u0644\u0649 \u0627\u0644\u0633\u0648\u0642 \u063A\u062F\u0627\u064B.",
+      "they finished their homework before dinner": "\u0644\u0642\u062F \u0623\u0646\u0647\u0648\u0627 \u0648\u0627\u062C\u0628\u0627\u062A\u0647\u0645 \u0627\u0644\u0645\u062F\u0631\u0633\u064A\u0629 \u0642\u0628\u0644 \u0627\u0644\u0639\u0634\u0627\u0621.",
+      "my sister works at a big hospital": "\u0623\u062E\u062A\u064A \u062A\u0639\u0645\u0644 \u0641\u064A \u0645\u0633\u062A\u0634\u0641\u0649 \u0643\u0628\u064A\u0631.",
+      "you must study hard for the exams": "\u064A\u062C\u0628 \u0639\u0644\u064A\u0643 \u0627\u0644\u0645\u0630\u0627\u0643\u0631\u0629 \u0628\u062C\u062F \u0644\u0644\u0627\u0645\u062A\u062D\u0627\u0646\u0627\u062A.",
+      "the train will arrive at five oclock": "\u0633\u064A\u0635\u0644 \u0627\u0644\u0642\u0637\u0627\u0631 \u0641\u064A \u0627\u0644\u0633\u0627\u0639\u0629 \u0627\u0644\u062E\u0627\u0645\u0633\u0629.",
+      "this smartphone is better than my old phone": "\u0647\u0630\u0627 \u0627\u0644\u0647\u0627\u062A\u0641 \u0627\u0644\u0630\u0643\u064A \u0623\u0641\u0636\u0644 \u0645\u0646 \u0647\u0627\u062A\u0641\u064A \u0627\u0644\u0642\u062F\u064A\u0645.",
+      "if it rains we will stay home": "\u0625\u0630\u0627 \u0623\u0645\u0637\u0631\u062A \u0633\u0646\u0628\u0642\u0649 \u0641\u064A \u0627\u0644\u0645\u0646\u0632\u0644.",
+      "learning english opens many great opportunities": "\u062A\u0639\u0644\u0645 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u064A\u0641\u062A\u062D \u0627\u0644\u0639\u062F\u064A\u062F \u0645\u0646 \u0627\u0644\u0641\u0631\u0635 \u0627\u0644\u0639\u0638\u064A\u0645\u0629.",
+      "he is interested in learning new skills": "\u0647\u0648 \u0645\u0647\u062A\u0645 \u0628\u062A\u0639\u0644\u0645 \u0645\u0647\u0627\u0631\u0627\u062A \u062C\u062F\u064A\u062F\u0629.",
+      "she prefers tea instead of hot coffee": "\u0647\u064A \u062A\u0641\u0636\u0644 \u0627\u0644\u0634\u0627\u064A \u0628\u062F\u0644\u0627\u064B \u0645\u0646 \u0627\u0644\u0642\u0647\u0648\u0629 \u0627\u0644\u0633\u0627\u062E\u0646\u0629.",
+      "we should protect our environment from pollution": "\u064A\u0646\u0628\u063A\u064A \u0639\u0644\u064A\u0646\u0627 \u062D\u0645\u0627\u064A\u0629 \u0628\u064A\u0626\u062A\u0646\u0627 \u0645\u0646 \u0627\u0644\u062A\u0644\u0648\u062B.",
+      "the children are playing happily in the garden": "\u0627\u0644\u0623\u0637\u0641\u0627\u0644 \u064A\u0644\u0639\u0628\u0648\u0646 \u0628\u0633\u0639\u0627\u062F\u0629 \u0641\u064A \u0627\u0644\u062D\u062F\u064A\u0642\u0629.",
+      "could you repeat that sentence more slowly please": "\u0647\u0644 \u064A\u0645\u0643\u0646\u0643 \u062A\u0643\u0631\u0627\u0631 \u0647\u0630\u0647 \u0627\u0644\u062C\u0645\u0644\u0629 \u0628\u0628\u0637\u0621 \u0623\u0643\u062B\u0631 \u0645\u0646 \u0641\u0636\u0644\u0643\u061F",
+      "he decided to buy a new laptop for work": "\u0642\u0631\u0631 \u0634\u0631\u0627\u0621 \u0643\u0645\u0628\u064A\u0648\u062A\u0631 \u0645\u062D\u0645\u0648\u0644 \u062C\u062F\u064A\u062F \u0644\u0644\u0639\u0645\u0644.",
+      "they went to the museum to see the ancient statues": "\u0630\u0647\u0628\u0648\u0627 \u0625\u0644\u0649 \u0627\u0644\u0645\u062A\u062D\u0641 \u0644\u0631\u0624\u064A\u0629 \u0627\u0644\u062A\u0645\u0627\u062B\u064A\u0644 \u0627\u0644\u0642\u062F\u064A\u0645\u0629."
+    };
+    if (sentenceDict[cleanNorm]) {
+      return sentenceDict[cleanNorm];
+    }
+    try {
+      const vocabList = [];
+      if (window.levelData && window.levelData.flashcards) {
+        vocabList.push(...window.levelData.flashcards);
+      }
+      if (window.levelData && window.levelData.curriculum) {
+        window.levelData.curriculum.forEach((lesson) => {
+          if (lesson.vocabulary) vocabList.push(...lesson.vocabulary);
+        });
+      }
+      if (vocabList.length > 0) {
+        const dictMap = {};
+        vocabList.forEach((v) => {
+          const enWord = (v.word || v.english || "").toLowerCase().trim();
+          const arWord = (v.translation || v.arabic || "").trim();
+          if (enWord && arWord) {
+            dictMap[enWord] = arWord;
+          }
+        });
+        const words = cleanNorm.split(" ");
+        const translatedWords = words.map((w) => {
+          if (dictMap[w]) return dictMap[w];
+          if (w.endsWith("s") && dictMap[w.slice(0, -1)]) return dictMap[w.slice(0, -1)];
+          return w;
+        });
+        const translatedCount = translatedWords.filter((w, idx) => w !== words[idx]).length;
+        if (translatedCount > 0) {
+          return `\u062A\u0631\u062C\u0645\u0629 \u062A\u0642\u0631\u064A\u0628\u064A\u0629: ${translatedWords.join(" ")}`;
+        }
+      }
+    } catch (e) {
+      console.warn("Auto translation helper failed:", e);
+    }
+    return "\u062A\u0631\u062A\u064A\u0628 \u0643\u0644\u0645\u0627\u062A \u0627\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0627\u0644\u0638\u0627\u0647\u0631\u0629 \u0628\u0627\u0644\u0623\u0633\u0641\u0644";
+  }
   function playSentenceBuilder(mount, { sentencePool, onWin, difficulty }) {
     injectStyles5();
     window.eea_game_cleanup = () => {
@@ -23862,7 +23979,7 @@
       sh = [...words].sort(() => Math.random() - 0.5);
       attempts++;
     }
-    sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence, translation: item.translation || "" };
+    sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence, translation: getSmartTranslation(item) };
     sb.answered = false;
     sb.timeLeft = sb.timePerSentence;
     renderRoundLayout2(mount);
@@ -23899,10 +24016,15 @@
         <div class="sb-timer-fill-bar" id="sb-timer-fill-el"></div>
       </div>
 
-      <!-- \u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0627\u0644\u0645\u0633\u062A\u0647\u062F\u0641\u0629 (\u062A\u0644\u0645\u064A\u062D \u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0625\u062C\u0628\u0627\u0631\u064A) -->
-      <div style="background: linear-gradient(135deg, var(--primary-glow) 0%, var(--bg-tertiary) 100%); border: 1.5px solid var(--primary); border-radius: 16px; padding: 16px; width: 100%; text-align: center; margin-bottom: 20px; box-shadow: var(--card-shadow-3d); direction: rtl;">
-        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">\u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0644\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629:</div>
-        <div style="font-size: 1.35rem; color: var(--primary); font-weight: 800; line-height: 1.4;">${sb.current.translation || "\u062A\u0631\u062C\u0645\u0629 \u063A\u064A\u0631 \u0645\u062A\u0648\u0641\u0631\u0629"}</div>
+      <!-- \u0642\u0633\u0645 \u062A\u0644\u0645\u064A\u062D \u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0627\u0644\u062A\u0641\u0627\u0639\u0644\u064A -->
+      <div style="width: 100%; text-align: center; margin-bottom: 20px;">
+        <button id="sb-toggle-translation-btn" class="sb-hint-action-btn">
+          <span>\u{1F441}\uFE0F \u0625\u0638\u0647\u0627\u0631 \u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u062C\u0645\u0644\u0629 \u0628\u0627\u0644\u0639\u0631\u0628\u064A\u0629</span>
+        </button>
+        <div id="sb-translation-content-box" style="display: none; margin-top: 12px; background: linear-gradient(135deg, var(--primary-glow) 0%, var(--bg-tertiary) 100%); border: 1.5px solid var(--primary); border-radius: 16px; padding: 16px; box-shadow: var(--card-shadow-3d); direction: rtl; animation: fadeIn 0.3s ease;">
+          <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">\u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0644\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629:</div>
+          <div style="font-size: 1.35rem; color: var(--primary); font-weight: 800; line-height: 1.4;">${sb.current.translation}</div>
+        </div>
       </div>
 
       <!-- \u0644\u0641\u0627\u0641\u0629 \u0627\u0644\u0628\u0631\u062F\u064A \u0644\u062A\u0639\u0644\u064A\u0645\u0627\u062A \u0627\u0644\u0644\u0639\u0628\u0629 -->
@@ -23976,6 +24098,20 @@
       renderRoundLayout2(mount);
     });
     mount.querySelector("#sb-submit-action-btn").addEventListener("click", () => submitAnswerSentence(mount));
+    const toggleBtn = mount.querySelector("#sb-toggle-translation-btn");
+    const contentBox = mount.querySelector("#sb-translation-content-box");
+    if (toggleBtn && contentBox) {
+      toggleBtn.addEventListener("click", () => {
+        const isHidden = contentBox.style.display === "none";
+        if (isHidden) {
+          contentBox.style.display = "block";
+          toggleBtn.innerHTML = `<span>\u{1F648} \u0625\u062E\u0641\u0627\u0621 \u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629</span>`;
+        } else {
+          contentBox.style.display = "none";
+          toggleBtn.innerHTML = `<span>\u{1F441}\uFE0F \u0625\u0638\u0647\u0627\u0631 \u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u062C\u0645\u0644\u0629 \u0628\u0627\u0644\u0639\u0631\u0628\u064A\u0629</span>`;
+        }
+      });
+    }
   }
   function selectWordTile(word, poolIdx, mount) {
     createAudioCtx();

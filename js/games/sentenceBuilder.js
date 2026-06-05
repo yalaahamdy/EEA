@@ -444,6 +444,32 @@ function injectStyles() {
     }
     .sb-notify-bar.correct { color: var(--success); }
     .sb-notify-bar.wrong { color: var(--error); }
+
+    /* زر التلميح الفخم للترجمة */
+    .sb-hint-action-btn {
+      width: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 auto;
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--surface-gradient), var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      font-family: 'Tajawal', sans-serif;
+    }
+    .sb-hint-action-btn:hover {
+      color: var(--text-main);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+      transform: translateY(-2px);
+    }
   `;
   document.head.appendChild(styleEl);
 }
@@ -506,6 +532,110 @@ function getGrammarTip(sentence) {
     return 'في المقارنة بين شيئين، نستخدم صيغة الصفة المقارنة (better) متبوعة بـ (than) لإظهار التفضيل.';
   }
   return 'تأمل ترتيب الكلمات جيداً: نبدأ بالفاعل (Subject) ثم الفعل (Verb) ثم المفعول (Object) أو باقي تفاصيل الجملة.';
+}
+
+// ==========================================
+// 🎨 المساعد الذكي لترجمة الجمل وتجنب "ترجمة غير متوفرة"
+// ==========================================
+function getSmartTranslation(item) {
+  if (item.translation && item.translation.trim() !== '' && item.translation !== 'ترجمة غير متوفرة') {
+    return item.translation;
+  }
+  
+  const sentence = item.sentence || '';
+  const cleanNorm = sentence.toLowerCase().replace(/[.?!,]/g, '').replace(/\s+/g, ' ').trim();
+  
+  const sentenceDict = {
+    'what is your daily routine': 'ما هو روتينك اليومي المعتاد؟',
+    'what is your daily routine like sarah': 'كيف يبدو روتينك اليومي يا سارة؟',
+    'i always wake up early at six take a shower and eat breakfast': 'أستيقظ دائماً مبكراً في السادسة، آخذ دشاً، وأتناول الفطور.',
+    'do you commute to work by bus': 'هل تذهب إلى العمل بالحافلة؟',
+    'no i usually walk i start work at eight and finish at four': 'لا، أنا أسير عادةً. أبدأ العمل في الثامنة وأنتهي في الرابعة.',
+    'my daily routine is simple': 'روتين حياتي اليومي بسيط.',
+    'i start work at eight': 'أبدأ العمل في الساعة الثامنة.',
+    'i enjoy reading in my free time': 'أستمتع بالقراءة في وقت فراغي.',
+    'what are your hobbies': 'ما هي هواياتك؟',
+    'music is my main interest': 'الموسيقى هي اهتمامي الأساسي.',
+    'i enjoy swimming': 'أستمتع بالسباحة.',
+    'i prefer tea to coffee': 'أفضل الشاي على القهوة.',
+    'i dislike loud noises': 'أكره الأصوات الصاخبة.',
+    'children play outside': 'الأطفال يلعبون في الخارج.',
+    'football is a popular sport': 'كرة القدم رياضة شعبية.',
+    'listen to the teacher': 'استمع إلى المعلم.',
+    'she loves classical music': 'هي تحب الموسيقى الكلاسيكية.',
+    'where is the nearest station': 'أين تقع أقرب محطة؟',
+    'can you help me please': 'هل يمكنك مساعدتي من فضلك؟',
+    'i am sorry for the mistake': 'أنا آسف على الخطأ.',
+    'thank you very much for your help': 'شكراً جزيلاً على مساعدتك.',
+    'nice to meet you': 'سررت بلقائك.',
+    'how can i help you today': 'كيف يمكنني مساعدتك اليوم؟',
+    'excuse me where is the library': 'معذرة، أين تقع المكتبة؟',
+    'it is a beautiful day today': 'إنه يوم جميل اليوم.',
+    'she is reading a very good book': 'هي تقرأ كتاباً جيداً جداً.',
+    'i would like to order some coffee': 'أود أن أطلب بعض القهوة.',
+    'the weather today is quite beautiful': 'الطقس اليوم جميل تماماً.',
+    'can you help me find the library': 'هل يمكنك مساعدتي في العثور على المكتبة؟',
+    'he speaks English very fluently': 'هو يتحدث الإنجليزية بطلاقة شديدة.',
+    'we are going to the market tomorrow': 'نحن ذاهبون إلى السوق غداً.',
+    'they finished their homework before dinner': 'لقد أنهوا واجباتهم المدرسية قبل العشاء.',
+    'my sister works at a big hospital': 'أختي تعمل في مستشفى كبير.',
+    'you must study hard for the exams': 'يجب عليك المذاكرة بجد للامتحانات.',
+    'the train will arrive at five oclock': 'سيصل القطار في الساعة الخامسة.',
+    'this smartphone is better than my old phone': 'هذا الهاتف الذكي أفضل من هاتفي القديم.',
+    'if it rains we will stay home': 'إذا أمطرت سنبقى في المنزل.',
+    'learning english opens many great opportunities': 'تعلم الإنجليزية يفتح العديد من الفرص العظيمة.',
+    'he is interested in learning new skills': 'هو مهتم بتعلم مهارات جديدة.',
+    'she prefers tea instead of hot coffee': 'هي تفضل الشاي بدلاً من القهوة الساخنة.',
+    'we should protect our environment from pollution': 'ينبغي علينا حماية بيئتنا من التلوث.',
+    'the children are playing happily in the garden': 'الأطفال يلعبون بسعادة في الحديقة.',
+    'could you repeat that sentence more slowly please': 'هل يمكنك تكرار هذه الجملة ببطء أكثر من فضلك؟',
+    'he decided to buy a new laptop for work': 'قرر شراء كمبيوتر محمول جديد للعمل.',
+    'they went to the museum to see the ancient statues': 'ذهبوا إلى المتحف لرؤية التماثيل القديمة.'
+  };
+
+  if (sentenceDict[cleanNorm]) {
+    return sentenceDict[cleanNorm];
+  }
+
+  // ترجمة تقريبية باستخدام الكلمات
+  try {
+    const vocabList = [];
+    if (window.levelData && window.levelData.flashcards) {
+      vocabList.push(...window.levelData.flashcards);
+    }
+    if (window.levelData && window.levelData.curriculum) {
+      window.levelData.curriculum.forEach(lesson => {
+        if (lesson.vocabulary) vocabList.push(...lesson.vocabulary);
+      });
+    }
+
+    if (vocabList.length > 0) {
+      const dictMap = {};
+      vocabList.forEach(v => {
+        const enWord = (v.word || v.english || '').toLowerCase().trim();
+        const arWord = (v.translation || v.arabic || '').trim();
+        if (enWord && arWord) {
+          dictMap[enWord] = arWord;
+        }
+      });
+
+      const words = cleanNorm.split(' ');
+      const translatedWords = words.map(w => {
+        if (dictMap[w]) return dictMap[w];
+        if (w.endsWith('s') && dictMap[w.slice(0, -1)]) return dictMap[w.slice(0, -1)];
+        return w;
+      });
+
+      const translatedCount = translatedWords.filter((w, idx) => w !== words[idx]).length;
+      if (translatedCount > 0) {
+        return `ترجمة تقريبية: ${translatedWords.join(' ')}`;
+      }
+    }
+  } catch (e) {
+    console.warn('Auto translation helper failed:', e);
+  }
+
+  return 'ترتيب كلمات الجملة الإنجليزية الظاهرة بالأسفل';
 }
 
 // ==========================================
@@ -612,7 +742,7 @@ function nextRound(mount) {
     attempts++;
   }
 
-  sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence, translation: item.translation || '' };
+  sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence, translation: getSmartTranslation(item) };
   sb.answered = false;
   sb.timeLeft = sb.timePerSentence;
 
@@ -655,10 +785,15 @@ function renderRoundLayout(mount) {
         <div class="sb-timer-fill-bar" id="sb-timer-fill-el"></div>
       </div>
 
-      <!-- الترجمة العربية المستهدفة (تلميح الترجمة الإجباري) -->
-      <div style="background: linear-gradient(135deg, var(--primary-glow) 0%, var(--bg-tertiary) 100%); border: 1.5px solid var(--primary); border-radius: 16px; padding: 16px; width: 100%; text-align: center; margin-bottom: 20px; box-shadow: var(--card-shadow-3d); direction: rtl;">
-        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">الترجمة العربية للجملة المطلوبة:</div>
-        <div style="font-size: 1.35rem; color: var(--primary); font-weight: 800; line-height: 1.4;">${sb.current.translation || 'ترجمة غير متوفرة'}</div>
+      <!-- قسم تلميح الترجمة العربية التفاعلي -->
+      <div style="width: 100%; text-align: center; margin-bottom: 20px;">
+        <button id="sb-toggle-translation-btn" class="sb-hint-action-btn">
+          <span>👁️ إظهار ترجمة الجملة بالعربية</span>
+        </button>
+        <div id="sb-translation-content-box" style="display: none; margin-top: 12px; background: linear-gradient(135deg, var(--primary-glow) 0%, var(--bg-tertiary) 100%); border: 1.5px solid var(--primary); border-radius: 16px; padding: 16px; box-shadow: var(--card-shadow-3d); direction: rtl; animation: fadeIn 0.3s ease;">
+          <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">الترجمة العربية للجملة المطلوبة:</div>
+          <div style="font-size: 1.35rem; color: var(--primary); font-weight: 800; line-height: 1.4;">${sb.current.translation}</div>
+        </div>
       </div>
 
       <!-- لفافة البردي لتعليمات اللعبة -->
@@ -746,6 +881,22 @@ function attachSBListeners(mount) {
   });
 
   mount.querySelector('#sb-submit-action-btn').addEventListener('click', () => submitAnswerSentence(mount));
+
+  // تلميح الترجمة العربية التفاعلي
+  const toggleBtn = mount.querySelector('#sb-toggle-translation-btn');
+  const contentBox = mount.querySelector('#sb-translation-content-box');
+  if (toggleBtn && contentBox) {
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = contentBox.style.display === 'none';
+      if (isHidden) {
+        contentBox.style.display = 'block';
+        toggleBtn.innerHTML = `<span>🙈 إخفاء الترجمة العربية</span>`;
+      } else {
+        contentBox.style.display = 'none';
+        toggleBtn.innerHTML = `<span>👁️ إظهار ترجمة الجملة بالعربية</span>`;
+      }
+    });
+  }
 }
 
 // ==========================================
