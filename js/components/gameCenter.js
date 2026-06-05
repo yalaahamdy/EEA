@@ -45,26 +45,37 @@ export function buildSentencePool(lessonIds = null) {
   (levelData.curriculum || []).forEach(lesson => {
     if (lessonIds && !lessonIds.includes(lesson.id)) return;
     
+    const practice = lesson.practice || {};
+    
     // 1. Dialogue lines
     const dialogueLines = lesson.dialogue?.lines || lesson.dialogue?.exchanges || [];
     dialogueLines.forEach(line => {
       const text = line.text || line.english || line.en || line.line;
-      const translation = line.translation || line.arabic || line.ar || line.arabicText || '';
+      let translation = line.translation || line.arabic || line.ar || line.arabicText || '';
       if (text) {
         const cleanedText = text.trim();
         if (cleanedText.split(' ').length >= 4) {
-          pool.push({ 
-            sentence: cleanedText, 
-            translation: translation.trim(),
-            lessonId: lesson.id, 
-            unitId: lesson.unitId 
-          });
+          // محاولة جلب الترجمة من التمارين الشبيهة في نفس الدرس إذا كانت مفقودة
+          if (!translation.trim() && practice.speaking) {
+            const sLine = practice.speaking.find(l => (l.text || '').replace(/[.?]/g, '').trim().toLowerCase() === cleanedText.replace(/[.?]/g, '').trim().toLowerCase());
+            if (sLine) {
+              translation = sLine.translation || sLine.arabic || sLine.ar || '';
+            }
+          }
+          
+          if (translation.trim()) {
+            pool.push({ 
+              sentence: cleanedText, 
+              translation: translation.trim(),
+              lessonId: lesson.id, 
+              unitId: lesson.unitId 
+            });
+          }
         }
       }
     });
 
     // 2. Practice exercises (general, listening, speaking)
-    const practice = lesson.practice || {};
     const exercisesList = [
       ...(practice.exercises || []),
       ...(practice.listening || []),
@@ -73,16 +84,33 @@ export function buildSentencePool(lessonIds = null) {
     
     exercisesList.forEach(ex => {
       const text = ex.sentence || ex.question || ex.text;
-      const translation = ex.translation || ex.arabic || ex.ar || ex.answerTranslation || '';
+      let translation = ex.translation || ex.arabic || ex.ar || ex.answerTranslation || '';
       if (text) {
         const cleanedText = text.replace(/[.?]/g, '').trim();
         if (cleanedText.split(' ').length >= 4) {
-          pool.push({ 
-            sentence: cleanedText, 
-            translation: translation.trim(),
-            lessonId: lesson.id, 
-            unitId: lesson.unitId 
-          });
+          // إذا كانت الترجمة مفقودة في التمرين، دعنا نبحث عنها في محادثات الدرس أو تمارين التحدث
+          if (!translation.trim()) {
+            const dLine = dialogueLines.find(l => (l.text || l.english || l.en || l.line || '').replace(/[.?]/g, '').trim().toLowerCase() === cleanedText.toLowerCase());
+            if (dLine) {
+              translation = dLine.translation || dLine.arabic || dLine.ar || '';
+            }
+          }
+          if (!translation.trim() && practice.speaking) {
+            const sLine = practice.speaking.find(l => (l.text || '').replace(/[.?]/g, '').trim().toLowerCase() === cleanedText.toLowerCase());
+            if (sLine) {
+              translation = sLine.translation || sLine.arabic || sLine.ar || '';
+            }
+          }
+
+          // فقط إذا توفرت ترجمة (من الدرس أو تم جلبها) نقوم بإضافتها
+          if (translation.trim()) {
+            pool.push({ 
+              sentence: cleanedText, 
+              translation: translation.trim(),
+              lessonId: lesson.id, 
+              unitId: lesson.unitId 
+            });
+          }
         }
       }
     });
