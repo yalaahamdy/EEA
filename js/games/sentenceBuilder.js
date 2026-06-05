@@ -641,6 +641,15 @@ function getSmartTranslation(item) {
 // ==========================================
 // 🎨 2. الدخول الرئيسي للعبة
 // ==========================================
+// خلط المصفوفة بطريقة Fisher-Yates لضمان عشوائية حقيقية وعادلة
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
 export function playSentenceBuilder(mount, { sentencePool, onWin, difficulty }) {
   injectStyles();
   
@@ -657,22 +666,43 @@ export function playSentenceBuilder(mount, { sentencePool, onWin, difficulty }) 
   };
 
   const diff = difficulty || 'medium';
+  
+  // تصفية الجمل المناسبة للطول
   let pool = (sentencePool || []).filter(s => {
     const words = s.sentence.replace(/[^a-zA-Z\s]/g, '').trim().split(/\s+/);
     return words.length >= 4 && words.length <= 11;
   });
 
+  // إذا كان المسبح أصغر من الجولات المطلوبة، ندمج معه الجمل الاحتياطية
   if (pool.length < ROUNDS) {
-    pool = [...pool, ...FALLBACK_SENTENCES];
+    const existing = new Set(pool.map(p => p.sentence.toLowerCase().trim()));
+    const uniqueFallbacks = FALLBACK_SENTENCES.filter(f => !existing.has(f.sentence.toLowerCase().trim()));
+    pool = [...pool, ...uniqueFallbacks];
   }
-  
+
+  // فلترة الجمل الملعوبة مؤخراً لتفادي التكرار المباشر
+  const RECENT_KEY = 'eea_sb_recent_sentences_v2';
+  let recent = [];
+  try {
+    recent = JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
+  } catch (e) {
+    recent = [];
+  }
+
+  if (pool.length > ROUNDS) {
+    const maxToExclude = pool.length - ROUNDS;
+    const toExclude = recent.slice(0, maxToExclude);
+    pool = pool.filter(item => !toExclude.includes(item.sentence.trim()));
+  }
+
   pool.forEach(item => {
     if (!item.tip) {
       item.tip = getGrammarTip(item.sentence);
     }
   });
 
-  pool = pool.sort(() => Math.random() - 0.5);
+  // خلط المسبح عشوائياً بشكل مثالي
+  pool = shuffleArray(pool);
 
   showIntroScreen(mount, pool, onWin, diff);
 }
@@ -704,9 +734,25 @@ function startGame(mount, pool, onWin, difficulty) {
   const times = { easy: 45, medium: 30, hard: 18 };
   const timePerSentence = times[difficulty] || 30;
 
+  const rounds = pool.slice(0, ROUNDS);
+
+  // تسجيل الجمل التي سيتم لعبها حالياً في الـ localStorage لتجنب تكرارها في المرات القادمة
+  const RECENT_KEY = 'eea_sb_recent_sentences_v2';
+  const playedSentences = rounds.map(r => r.sentence.trim());
+  let recent = [];
+  try {
+    recent = JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
+  } catch (e) {
+    recent = [];
+  }
+  recent = [...playedSentences, ...recent.filter(s => !playedSentences.includes(s))].slice(0, 25);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch (e) {}
+
   sb = {
     pool,
-    rounds: pool.slice(0, ROUNDS),
+    rounds,
     round: 0,
     score: 0,
     streak: 0,
