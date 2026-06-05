@@ -49,10 +49,16 @@ export function buildSentencePool(lessonIds = null) {
     const dialogueLines = lesson.dialogue?.lines || lesson.dialogue?.exchanges || [];
     dialogueLines.forEach(line => {
       const text = line.text || line.english || line.en || line.line;
+      const translation = line.translation || line.arabic || line.ar || line.arabicText || '';
       if (text) {
         const cleanedText = text.trim();
         if (cleanedText.split(' ').length >= 4) {
-          pool.push({ sentence: cleanedText, lessonId: lesson.id, unitId: lesson.unitId });
+          pool.push({ 
+            sentence: cleanedText, 
+            translation: translation.trim(),
+            lessonId: lesson.id, 
+            unitId: lesson.unitId 
+          });
         }
       }
     });
@@ -67,10 +73,16 @@ export function buildSentencePool(lessonIds = null) {
     
     exercisesList.forEach(ex => {
       const text = ex.sentence || ex.question || ex.text;
+      const translation = ex.translation || ex.arabic || ex.ar || ex.answerTranslation || '';
       if (text) {
         const cleanedText = text.replace(/[.?]/g, '').trim();
         if (cleanedText.split(' ').length >= 4) {
-          pool.push({ sentence: cleanedText, lessonId: lesson.id, unitId: lesson.unitId });
+          pool.push({ 
+            sentence: cleanedText, 
+            translation: translation.trim(),
+            lessonId: lesson.id, 
+            unitId: lesson.unitId 
+          });
         }
       }
     });
@@ -227,7 +239,8 @@ function launchGame(game, container) {
     selectedUnits: levelData.units.map(u => u.id),
     selectedLessons: levelData.curriculum.map(l => l.id),
     difficulty: game.difficulty.toLowerCase(),
-    sound: isSoundEnabled()
+    sound: isSoundEnabled(),
+    hangmanMode: 'words'
   };
 
   function updateSetupUI() {
@@ -253,9 +266,11 @@ function launchGame(game, container) {
     const vocabPool = buildVocabPool(lessonIds);
     const sentencePool = buildSentencePool(lessonIds);
 
-    const isVocabGame = GAME_REQS[game.id].vocab > 0;
+    const isVocabGame = game.id === 'hangman' ? (setupState.hangmanMode === 'words') : (GAME_REQS[game.id].vocab > 0);
     const poolSize = isVocabGame ? vocabPool.length : sentencePool.length;
-    const reqSize = isVocabGame ? GAME_REQS[game.id].vocab : GAME_REQS[game.id].sentences;
+    const reqSize = game.id === 'hangman'
+      ? (setupState.hangmanMode === 'words' ? 3 : 2)
+      : (isVocabGame ? GAME_REQS[game.id].vocab : GAME_REQS[game.id].sentences);
     const isValid = poolSize >= reqSize;
 
     const tabHTML = `
@@ -378,7 +393,32 @@ function launchGame(game, container) {
 
     const validationHTML = isValid
       ? `<div class="gc-setup-valid-badge">✓ تم اختيار محتوى مناسب: تم تحديد <strong>${poolSize}</strong> ${isVocabGame ? 'كلمة' : 'جملة'} (الحد الأدنى المطلوب ${reqSize}).</div>`
-      : `<div class="gc-setup-invalid-badge">⚠️ محتوى غير كافٍ للعب: يحتوي النطاق المختار على <strong>${poolSize}</strong> فقط، بينما تتطلب اللعبة ${GAME_REQS[game.id].label} كحد أدنى. الرجاء تحديد المزيد من الدروس.</div>`;
+      : `<div class="gc-setup-invalid-badge">⚠️ محتوى غير كافٍ للعب: يحتوي النطاق المختار على <strong>${poolSize}</strong> فقط، بينما تتطلب اللعبة ${game.id === 'hangman' ? (setupState.hangmanMode === 'words' ? '3 كلمات إنجليزية' : 'جملتين كاملتين') : GAME_REQS[game.id].label} كحد أدنى. الرجاء تحديد المزيد من الدروس.</div>`;
+
+    let hangmanOptionsHTML = '';
+    if (game.id === 'hangman') {
+      hangmanOptionsHTML = `
+        <div class="gc-setup-difficulty-section" style="margin-bottom: 20px;">
+          <label class="gc-setup-section-lbl">نوع المحتوى المستهدف للعب:</label>
+          <div class="gc-setup-diff-cards">
+            <div class="gc-setup-diff-card ${setupState.hangmanMode === 'words' ? 'active' : ''}" data-hm-mode="words" style="--card-border-color: var(--primary);">
+              <div class="gc-diff-dot"></div>
+              <div class="gc-diff-details">
+                <span class="gc-diff-name" style="color: var(--primary);">كلمات مفردة (Words)</span>
+                <span class="gc-diff-desc">تخمين كلمات مفردة من الدروس المحددة.</span>
+              </div>
+            </div>
+            <div class="gc-setup-diff-card ${setupState.hangmanMode === 'sentences' ? 'active' : ''}" data-hm-mode="sentences" style="--card-border-color: var(--accent);">
+              <div class="gc-diff-dot"></div>
+              <div class="gc-diff-details">
+                <span class="gc-diff-name" style="color: var(--accent);">جمل كاملة (Sentences)</span>
+                <span class="gc-diff-desc">تخمين جمل كاملة مستخرجة من المحادثات والتمارين.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     mainMount.innerHTML = `
       <div class="gc-setup-container">
@@ -392,6 +432,7 @@ function launchGame(game, container) {
 
         ${tabHTML}
         ${selectorHTML}
+        ${hangmanOptionsHTML}
         ${difficultyHTML}
         ${soundHTML}
         ${validationHTML}
@@ -466,6 +507,13 @@ function launchGame(game, container) {
       });
     }
 
+    mainMount.querySelectorAll('[data-hm-mode]').forEach(card => {
+      card.addEventListener('click', () => {
+        setupState.hangmanMode = card.dataset.hmMode;
+        updateSetupUI();
+      });
+    });
+
     mainMount.querySelectorAll('.gc-setup-diff-card').forEach(card => {
       card.addEventListener('click', () => {
         setupState.difficulty = card.dataset.diff;
@@ -490,6 +538,7 @@ function launchGame(game, container) {
           vocabPool,
           sentencePool,
           difficulty: setupState.difficulty,
+          hangmanMode: setupState.hangmanMode,
           onWin: (score) => {
             saveGameScore(game.id, score);
             const mults = { easy: 1.0, medium: 1.2, hard: 1.5 };

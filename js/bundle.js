@@ -20398,12 +20398,24 @@
   var state = {};
   var _physicalKeyListener = null;
   var _canvasAnimFrame = null;
-  function resetState(wordObj, difficulty) {
+  function resetState(wordObj, difficulty, hangmanMode) {
     const maxWrongs = { easy: 8, medium: 6, hard: 4 };
     const maxWrong = maxWrongs[difficulty] || 6;
+    const mode = hangmanMode || "words";
+    let rawText = "";
+    let arabicHint = "";
+    if (mode === "words") {
+      rawText = wordObj.english || wordObj.word || "";
+      rawText = rawText.toUpperCase().replace(/[^A-Z]/g, "");
+      arabicHint = wordObj.arabic || wordObj.translation || "";
+    } else {
+      rawText = wordObj.sentence || wordObj.english || wordObj.word || "";
+      rawText = rawText.toUpperCase().replace(/[^A-Z\s]/g, "").replace(/\s+/g, " ").trim();
+      arabicHint = wordObj.translation || wordObj.arabic || "";
+    }
     state = {
-      word: wordObj.english.toUpperCase().replace(/[^A-Z]/g, ""),
-      arabicHint: wordObj.arabic,
+      word: rawText,
+      arabicHint,
       guessed: /* @__PURE__ */ new Set(),
       wrong: 0,
       maxWrong,
@@ -20413,10 +20425,14 @@
       score: 0,
       difficulty,
       roundNum: 0,
-      totalScore: 0
+      totalScore: 0,
+      hangmanMode: mode
     };
+    if (mode === "sentences") {
+      state.guessed.add(" ");
+    }
   }
-  function playHangman(mount, { vocabPool, onWin, difficulty }) {
+  function playHangman(mount, { vocabPool, sentencePool, onWin, difficulty, hangmanMode }) {
     injectStyles();
     window.eea_game_cleanup = () => {
       if (_physicalKeyListener) {
@@ -20425,30 +20441,40 @@
       }
       stopParticleSystem();
     };
-    if (!vocabPool || vocabPool.length === 0) {
+    const mode = hangmanMode || "words";
+    const pool = mode === "words" ? vocabPool || [] : sentencePool || [];
+    if (pool.length === 0) {
       mount.innerHTML = `
       <div class="gc-error" style="font-family:'Tajawal', sans-serif;">
-        \u26A0\uFE0F \u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0641\u0631\u062F\u0627\u062A \u0645\u062A\u0627\u062D\u0629 \u0641\u064A \u0627\u0644\u062F\u0631\u0648\u0633 \u0627\u0644\u0645\u062D\u062F\u062F\u0629. \u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u062F\u0631\u0648\u0633 \u0625\u0636\u0627\u0641\u064A\u0629!
+        \u26A0\uFE0F \u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u062D\u062A\u0648\u064A\u0627\u062A \u0645\u062A\u0627\u062D\u0629 \u0641\u064A \u0627\u0644\u062F\u0631\u0648\u0633 \u0627\u0644\u0645\u062D\u062F\u062F\u0629 \u0644\u0644\u0639\u0628 \u0628\u0647\u0630\u0627 \u0627\u0644\u0646\u0645\u0637.
       </div>`;
       return;
     }
     const diff = difficulty || "medium";
-    startRound(mount, vocabPool, onWin, 0, 0, diff);
+    startRound(mount, pool, onWin, 0, 0, diff, mode);
   }
-  function startRound(mount, pool, onWin, roundNum, totalScore, difficulty) {
+  function startRound(mount, pool, onWin, roundNum, totalScore, difficulty, hangmanMode) {
+    const mode = hangmanMode || "words";
     const eligible = pool.filter((v) => {
-      const clean = v.english.toUpperCase().replace(/[^A-Z]/g, "");
-      return clean.length >= 3 && clean.length <= 14;
+      if (mode === "words") {
+        const text = v.english || v.word || "";
+        const clean = text.toUpperCase().replace(/[^A-Z]/g, "");
+        return clean.length >= 3 && clean.length <= 14;
+      } else {
+        const text = v.sentence || v.english || v.word || "";
+        const clean = text.toUpperCase().replace(/[^A-Z\s]/g, "").replace(/\s+/g, " ").trim();
+        return clean.length >= 5 && clean.length <= 35;
+      }
     });
     if (eligible.length === 0) {
       mount.innerHTML = `
       <div class="gc-error" style="font-family:'Tajawal', sans-serif;">
-        \u26A0\uFE0F \u0644\u0627 \u062A\u0648\u062C\u062F \u0643\u0644\u0645\u0627\u062A \u0645\u0637\u0627\u0628\u0642\u0629 \u0644\u0644\u0634\u0631\u0648\u0637 \u0641\u064A \u0627\u0644\u062F\u0631\u0648\u0633 \u0627\u0644\u0645\u062D\u062F\u062F\u0629.
+        \u26A0\uFE0F \u0644\u0627 \u062A\u0648\u062C\u062F \u062C\u0645\u0644 \u0623\u0648 \u0643\u0644\u0645\u0627\u062A \u0645\u0637\u0627\u0628\u0642\u0629 \u0644\u0644\u0634\u0631\u0648\u0637 \u0641\u064A \u0627\u0644\u062F\u0631\u0648\u0633 \u0627\u0644\u0645\u062D\u062F\u062F\u0629.
       </div>`;
       return;
     }
     const wordObj = eligible[Math.floor(Math.random() * eligible.length)];
-    resetState(wordObj, difficulty);
+    resetState(wordObj, difficulty, mode);
     state.roundNum = roundNum;
     state.totalScore = totalScore;
     renderGameLayout(mount, pool, onWin);
@@ -20457,6 +20483,7 @@
   function renderGameLayout(mount, pool, onWin) {
     const hintCostHTML = state.difficulty === "easy" ? "\u0645\u062C\u0627\u0646\u064A" : "-5 \u0646\u0642\u0627\u0637";
     const isHard = state.difficulty === "hard";
+    const isSentence = state.hangmanMode === "sentences";
     mount.innerHTML = `
     <div class="hm-premium-container" id="hm-premium-root">
       <!-- \u0643\u0627\u0646\u0641\u0627\u0633 \u0627\u0644\u062C\u0632\u064A\u0626\u0627\u062A \u0644\u062A\u0623\u062B\u064A\u0631\u0627\u062A \u0627\u0644\u0641\u0648\u0632 \u0648\u0627\u0644\u062E\u0633\u0627\u0631\u0629 -->
@@ -20477,7 +20504,7 @@
       <!-- \u0644\u0641\u0627\u0641\u0629 \u0627\u0644\u0628\u0631\u062F\u064A \u0644\u0644\u0645\u0633\u0627\u0639\u062F\u0629 \u0648\u0627\u0644\u062A\u0639\u0644\u064A\u0645\u0627\u062A -->
       <div class="hm-parchment-scroll">
         <div class="hm-parchment-title">\u{1F4DC} \u062F\u0644\u064A\u0644 \u0627\u0644\u0635\u0645\u0648\u062F \u0627\u0644\u0644\u063A\u0648\u064A:</div>
-        \u062A\u0645 \u0627\u062E\u062A\u064A\u0627\u0631 \u0643\u0644\u0645\u0629 \u0628\u0627\u0644\u0644\u063A\u0629 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0645\u0646 \u062F\u0631\u0648\u0633\u0643. \u062E\u0645\u0646 \u0627\u0644\u062D\u0631\u0648\u0641 \u0644\u062A\u0646\u0642\u0630 \u0635\u062F\u064A\u0642\u0643! \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0627\u0644\u0633\u0631\u064A\u0639\u0629 \u0648\u0627\u0644\u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0623\u062E\u0637\u0627\u0621 \u062A\u0645\u0646\u062D\u0643 \u0646\u0642\u0627\u0637\u0627\u064B \u0645\u0636\u0627\u0639\u0641\u0629.
+        \u062A\u0645 \u0627\u062E\u062A\u064A\u0627\u0631 ${isSentence ? "\u062C\u0645\u0644\u0629 \u0643\u0627\u0645\u0644\u0629" : "\u0643\u0644\u0645\u0629 \u0645\u0641\u0631\u062F\u0629"} \u0628\u0627\u0644\u0644\u063A\u0629 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0645\u0646 \u062F\u0631\u0648\u0633\u0643. \u062E\u0645\u0646 \u0627\u0644\u062D\u0631\u0648\u0641 \u0644\u062A\u0646\u0642\u0630 \u0635\u062F\u064A\u0642\u0643! \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0627\u0644\u0633\u0631\u064A\u0639\u0629 \u0648\u0627\u0644\u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0623\u062E\u0637\u0627\u0621 \u062A\u0645\u0646\u062D\u0643 \u0646\u0642\u0627\u0637\u0627\u064B \u0645\u0636\u0627\u0639\u0641\u0629.
       </div>
 
       <!-- \u0627\u0644\u062C\u0633\u0645 \u0627\u0644\u0623\u0633\u0627\u0633\u064A \u0627\u0644\u0645\u0642\u0633\u0645 \u0644\u0639\u0645\u0648\u062F\u064A\u0646 -->
@@ -20495,7 +20522,7 @@
             </div>
           ` : `
             <button class="hm-hint-action-btn" id="hm-premium-hint-btn">
-              <span>\u{1F4A1} \u0637\u0644\u0628 \u062A\u0644\u0645\u064A\u062D \u0645\u0631\u0627\u062F\u0641 \u0628\u0627\u0644\u0639\u0631\u0628\u064A\u0629</span>
+              <span>\u{1F4A1} ${isSentence ? "\u0637\u0644\u0628 \u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u062C\u0645\u0644\u0629 \u0628\u0627\u0644\u0639\u0631\u0628\u064A\u0629" : "\u0637\u0644\u0628 \u062A\u0644\u0645\u064A\u062D \u0645\u0631\u0627\u062F\u0641 \u0628\u0627\u0644\u0639\u0631\u0628\u064A\u0629"}</span>
               <span style="font-size:0.8rem; background:var(--bg-primary); padding:2px 8px; border-radius:6px; margin-right:6px; color:var(--text-muted); border:1px solid var(--border-color);">(${hintCostHTML})</span>
             </button>
           `}
@@ -20503,11 +20530,11 @@
 
         <!-- \u0627\u0644\u0639\u0645\u0648\u062F \u0627\u0644\u0623\u064A\u0645\u0646: \u0627\u0644\u0643\u0644\u0645\u0629 \u0648\u0627\u0644\u0640 Keyboard -->
         <div class="hm-word-panel">
-          <div class="hm-word-slots" id="hm-slots-container">
+          <div class="hm-word-slots" id="hm-slots-container" style="width: 100%; display: flex; flex-wrap: wrap; justify-content: center;">
             ${renderWordSlots()}
           </div>
           <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-4px;">
-            \u062A\u062A\u0643\u0648\u0646 \u0627\u0644\u0643\u0644\u0645\u0629 \u0645\u0646 <strong>${state.word.length}</strong> \u062D\u0631\u0648\u0641 (Letters)
+            \u064A\u062A\u0643\u0648\u0646 \u0627\u0644\u0644\u063A\u0632 \u0645\u0646 <strong>${state.word.length}</strong> ${isSentence ? "\u062D\u0631\u0641\u0627\u064B \u0648\u0631\u0645\u0632\u0627\u064B (Characters)" : "\u062D\u0631\u0648\u0641 (Letters)"}
           </p>
 
           <!-- \u0627\u0644\u0643\u064A\u0628\u0648\u0631\u062F \u0627\u0644\u0645\u064A\u0643\u0627\u0646\u064A\u0643\u064A -->
@@ -20690,15 +20717,34 @@
     }).join("");
   }
   function renderWordSlots() {
-    return state.word.split("").map((letter) => {
-      const isRevealed = state.guessed.has(letter);
-      return `
-      <span class="hm-letter-slot ${isRevealed ? "revealed" : ""}">
-        <span class="hm-letter-char">${letter}</span>
-        <span class="hm-letter-underline"></span>
-      </span>
-    `;
-    }).join("");
+    if (state.hangmanMode === "sentences") {
+      const wordsArray = state.word.split(" ");
+      return wordsArray.map((word) => {
+        return `
+        <div class="hm-word-group" style="display: inline-flex; gap: 6px; margin: 4px 6px; flex-wrap: nowrap;">
+          ${word.split("").map((letter) => {
+          const isRevealed = state.guessed.has(letter);
+          return `
+              <span class="hm-letter-slot ${isRevealed ? "revealed" : ""}" style="width: 26px; height: 36px; font-size: 1.25rem;">
+                <span class="hm-letter-char">${letter}</span>
+                <span class="hm-letter-underline" style="height: 2px;"></span>
+              </span>
+            `;
+        }).join("")}
+        </div>
+      `;
+      }).join("");
+    } else {
+      return state.word.split("").map((letter) => {
+        const isRevealed = state.guessed.has(letter);
+        return `
+        <span class="hm-letter-slot ${isRevealed ? "revealed" : ""}">
+          <span class="hm-letter-char">${letter}</span>
+          <span class="hm-letter-underline"></span>
+        </span>
+      `;
+      }).join("");
+    }
   }
   function attachEventListeners(mount, pool, onWin) {
     mount.querySelectorAll(".hm-mech-key").forEach((btn) => {
@@ -20819,12 +20865,13 @@
     triggerParticles("win");
     const overlay = mount.querySelector("#hm-premium-overlay");
     if (!overlay) return;
+    const isSentence = state.hangmanMode === "sentences";
     overlay.style.display = "flex";
     overlay.innerHTML = `
     <div class="hm-result-window">
       <div class="hm-res-badge">\u{1F389}</div>
       <h2 class="hm-res-title win">\u0623\u062D\u0633\u0646\u062A! \u0625\u062C\u0627\u0628\u0629 \u0635\u062D\u064A\u062D\u0629</h2>
-      <p class="hm-res-word-reveal">\u0627\u0644\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0643\u062A\u0634\u0641\u0629 \u0647\u064A: <strong>${state.word}</strong></p>
+      <p class="hm-res-word-reveal">${isSentence ? "\u0627\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0645\u0643\u062A\u0634\u0641\u0629 \u0647\u064A" : "\u0627\u0644\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0643\u062A\u0634\u0641\u0629 \u0647\u064A"}: <strong>${state.word}</strong></p>
       
       <div style="background:rgba(255,255,255,0.03); border:1px dashed var(--border-color); border-radius:12px; padding:12px; margin-bottom:18px;">
         <span style="color:var(--text-muted); font-size:0.85rem; display:block; margin-bottom:4px;">\u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0648\u0627\u0644\u0631\u062F\u064A\u0641 \u0628\u0627\u0644\u0639\u0631\u0628\u064A\u0629:</span>
@@ -20844,7 +20891,7 @@
 
       <div class="hm-action-row">
         <button class="btn btn-primary" id="hm-next-round-btn" style="padding:10px 24px; font-weight:700;">
-          \u0627\u0644\u0643\u0644\u0645\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629 \u2192
+          ${isSentence ? "\u0627\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629 \u2190" : "\u0627\u0644\u0643\u0644\u0645\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629 \u2192"}
         </button>
         <button class="btn btn-secondary" id="hm-quit-btn" style="padding:10px 20px;">
           \u062E\u0631\u0648\u062C \u0644\u0644\u0623\u0644\u0639\u0627\u0628
@@ -20854,7 +20901,7 @@
   `;
     overlay.querySelector("#hm-next-round-btn").addEventListener("click", () => {
       stopParticleSystem();
-      startRound(mount, pool, onWin, state.roundNum + 1, state.totalScore, state.difficulty);
+      startRound(mount, pool, onWin, state.roundNum + 1, state.totalScore, state.difficulty, state.hangmanMode);
     });
     overlay.querySelector("#hm-quit-btn").addEventListener("click", () => {
       stopParticleSystem();
@@ -20868,12 +20915,13 @@
     triggerParticles("lose");
     const overlay = mount.querySelector("#hm-premium-overlay");
     if (!overlay) return;
+    const isSentence = state.hangmanMode === "sentences";
     overlay.style.display = "flex";
     overlay.innerHTML = `
     <div class="hm-result-window">
       <div class="hm-res-badge">\u{1F480}</div>
       <h2 class="hm-res-title lose">\u062D\u0638 \u0623\u0648\u0641\u0631! \u0644\u0645 \u062A\u0646\u062C\u062D</h2>
-      <p class="hm-res-word-reveal">\u0627\u0644\u0643\u0644\u0645\u0629 \u0627\u0644\u0635\u062D\u064A\u062D\u0629 \u0643\u0627\u0646\u062A: <strong>${state.word}</strong></p>
+      <p class="hm-res-word-reveal">${isSentence ? "\u0627\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0635\u062D\u064A\u062D\u0629 \u0643\u0627\u0646\u062A" : "\u0627\u0644\u0643\u0644\u0645\u0629 \u0627\u0644\u0635\u062D\u064A\u062D\u0629 \u0643\u0627\u0646\u062A"}: <strong>${state.word}</strong></p>
       
       <div style="background:rgba(255,255,255,0.03); border:1px dashed var(--border-color); border-radius:12px; padding:12px; margin-bottom:18px;">
         <span style="color:var(--text-muted); font-size:0.85rem; display:block; margin-bottom:4px;">\u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0635\u062D\u064A\u062D\u0629:</span>
@@ -20899,7 +20947,7 @@
   `;
     overlay.querySelector("#hm-retry-round-btn").addEventListener("click", () => {
       stopParticleSystem();
-      startRound(mount, pool, onWin, state.roundNum, state.totalScore, state.difficulty);
+      startRound(mount, pool, onWin, state.roundNum, state.totalScore, state.difficulty, state.hangmanMode);
     });
     overlay.querySelector("#hm-quit-btn2").addEventListener("click", () => {
       stopParticleSystem();
@@ -21238,6 +21286,7 @@
       }
       .mm-cards-grid {
         gap: 8px;
+        grid-template-columns: repeat(4, 1fr) !important;
       }
       .mm-card-face {
         padding: 6px;
@@ -23205,82 +23254,102 @@
   var FALLBACK_SENTENCES = [
     {
       sentence: "She is reading a very good book",
+      translation: "\u0647\u064A \u062A\u0642\u0631\u0623 \u0643\u062A\u0627\u0628\u0627\u064B \u062C\u064A\u062F\u0627\u064B \u062C\u062F\u0627\u064B",
       tip: "\u0627\u0644\u0635\u0641\u0629 (good) \u062A\u0633\u0628\u0642 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0635\u0648\u0641 (book) \u062F\u0627\u0626\u0645\u0627\u064B \u0641\u064A \u0627\u0644\u0644\u063A\u0629 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629\u060C \u0648\u064A\u0633\u0628\u0642\u0647\u0627 \u0627\u0644\u062D\u0627\u0644 (very) \u0644\u062A\u0642\u0648\u064A\u0629 \u0627\u0644\u0645\u0639\u0646\u0649."
     },
     {
       sentence: "I would like to order some coffee",
+      translation: "\u0623\u0648\u062F \u0623\u0646 \u0623\u0637\u0644\u0628 \u0628\u0639\u0636 \u0627\u0644\u0642\u0647\u0648\u0629",
       tip: "\u0627\u0644\u062A\u0639\u0628\u064A\u0631 (would like) \u0637\u0631\u064A\u0642\u0629 \u0645\u0647\u0630\u0628\u0629 \u0644\u0644\u063A\u0627\u064A\u0629 \u0644\u0637\u0644\u0628 \u0627\u0644\u0623\u0634\u064A\u0627\u0621 \u0641\u064A \u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u062A\u0639\u0646\u064A (\u0623\u0648\u062F \u0623\u0646) \u0648\u064A\u062A\u0628\u0639\u0647\u0627 \u0627\u0644\u0641\u0639\u0644 \u0628\u0627\u0644\u0645\u0635\u062F\u0631."
     },
     {
       sentence: "The weather today is quite beautiful",
+      translation: "\u0627\u0644\u0637\u0642\u0633 \u0627\u0644\u064A\u0648\u0645 \u062C\u0645\u064A\u0644 \u062A\u0645\u0627\u0645\u0627\u064B",
       tip: "\u0646\u0636\u0639 \u0627\u0644\u0641\u0639\u0644 \u0627\u0644\u0645\u0633\u0627\u0639\u062F (is) \u0642\u0628\u0644 \u0627\u0644\u0635\u0641\u0629 (beautiful) \u0644\u0631\u0628\u0637 \u0627\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0627\u0633\u0645\u064A\u0629\u060C \u0648\u064A\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u0638\u0631\u0641 (quite) \u0644\u062A\u0639\u062F\u064A\u0644 \u062F\u0631\u062C\u0629 \u0627\u0644\u0635\u0641\u0629."
     },
     {
       sentence: "Can you help me find the library",
+      translation: "\u0647\u0644 \u064A\u0645\u0643\u0646\u0643 \u0645\u0633\u0627\u0639\u062F\u062A\u064A \u0641\u064A \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0643\u062A\u0628\u0629",
       tip: "\u0627\u0644\u0633\u0624\u0627\u0644 \u0628\u0640 (Can you) \u0647\u0648 \u0627\u0644\u0623\u0633\u0644\u0648\u0628 \u0627\u0644\u0634\u0627\u0626\u0639 \u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629 \u0645\u0646 \u0627\u0644\u0622\u062E\u0631\u064A\u0646 \u0628\u0637\u0631\u064A\u0642\u0629 \u0648\u062F\u064A\u0629\u060C \u0648\u064A\u062A\u0628\u0639\u0647 \u0627\u0644\u0641\u0639\u0644 \u0628\u0627\u0644\u0645\u0635\u062F\u0631 \u0645\u062C\u0631\u062F\u0627\u064B."
     },
     {
       sentence: "He speaks English very fluently",
+      translation: "\u0647\u0648 \u064A\u062A\u062D\u062F\u062B \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0628\u0637\u0644\u0627\u0642\u0629 \u0634\u062F\u064A\u062F\u0629",
       tip: "\u0627\u0644\u062D\u0627\u0644 (fluently) \u064A\u0646\u062A\u0647\u064A \u0628\u0640 ly \u0648\u064A\u0623\u062A\u064A \u0628\u0639\u062F \u0627\u0644\u0641\u0639\u0644 \u0648\u0627\u0644\u0645\u0641\u0639\u0648\u0644 \u0644\u064A\u0635\u0641 \u0637\u0631\u064A\u0642\u0629 \u0648\u0623\u0633\u0644\u0648\u0628 \u0627\u0644\u062A\u062D\u062F\u062B \u0628\u0637\u0644\u0627\u0642\u0629."
     },
     {
       sentence: "We are going to the market tomorrow",
+      translation: "\u0646\u062D\u0646 \u0630\u0627\u0647\u0628\u0648\u0646 \u0625\u0644\u0649 \u0627\u0644\u0633\u0648\u0642 \u063A\u062F\u0627\u064B",
       tip: "\u0627\u0644\u062A\u0631\u0643\u064A\u0628 (are going to) \u064A\u0633\u062A\u062E\u062F\u0645 \u0644\u0644\u062A\u0639\u0628\u064A\u0631 \u0639\u0646 \u062A\u0631\u062A\u064A\u0628\u0627\u062A \u0648\u062E\u0637\u0637 \u0645\u0633\u062A\u0642\u0628\u0644\u064A\u0629 \u0645\u0624\u0643\u062F\u0629 \u0628\u0646\u0627\u0621 \u0639\u0644\u0649 \u0646\u0648\u0627\u064A\u0627 \u0645\u0633\u0628\u0642\u0629."
     },
     {
       sentence: "They finished their homework before dinner",
+      translation: "\u0644\u0642\u062F \u0623\u0646\u0647\u0648\u0627 \u0648\u0627\u062C\u0628\u0627\u062A\u0647\u0645 \u0627\u0644\u0645\u062F\u0631\u0633\u064A\u0629 \u0642\u0628\u0644 \u0627\u0644\u0639\u0634\u0627\u0621",
       tip: "\u0627\u0644\u0641\u0639\u0644 (finished) \u0641\u064A \u0627\u0644\u0645\u0627\u0636\u064A \u0627\u0644\u0628\u0633\u064A\u0637 \u064A\u0639\u0628\u0631 \u0639\u0646 \u062D\u062F\u062B \u0627\u0646\u062A\u0647\u0649 \u062A\u0645\u0627\u0645\u0627\u064B \u0641\u064A \u0627\u0644\u0645\u0627\u0636\u064A\u060C \u0648\u064A\u062A\u0628\u0639\u0647 \u062D\u0631\u0641 \u0627\u0644\u062C\u0631 \u0627\u0644\u0632\u0645\u0646\u064A (before)."
     },
     {
       sentence: "My sister works at a big hospital",
+      translation: "\u0623\u062E\u062A\u064A \u062A\u0639\u0645\u0644 \u0641\u064A \u0645\u0633\u062A\u0634\u0641\u0649 \u0643\u0628\u064A\u0631",
       tip: "\u062D\u0631\u0641 \u0627\u0644\u062C\u0631 (at) \u064A\u0633\u062A\u062E\u062F\u0645 \u0644\u0644\u062A\u0639\u0628\u064A\u0631 \u0639\u0646 \u0627\u0644\u062A\u0648\u0627\u062C\u062F \u062F\u0627\u062E\u0644 \u0645\u0624\u0633\u0633\u0629 \u0623\u0648 \u0645\u0643\u0627\u0646 \u0639\u0645\u0644 \u0645\u062D\u062F\u062F\u060C \u0648\u062A\u0633\u0628\u0642 \u0627\u0644\u0635\u0641\u0629 (big) \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0635\u0648\u0641 (hospital)."
     },
     {
       sentence: "You must study hard for the exams",
+      translation: "\u064A\u062C\u0628 \u0639\u0644\u064A\u0643 \u0627\u0644\u0645\u0630\u0627\u0643\u0631\u0629 \u0628\u062C\u062F \u0644\u0644\u0627\u0645\u062A\u062D\u0627\u0646\u0627\u062A",
       tip: "\u0627\u0644\u0641\u0639\u0644 \u0627\u0644\u0645\u0633\u0627\u0639\u062F (must) \u064A\u0639\u0628\u0631 \u0639\u0646 \u0627\u0644\u0627\u0644\u062A\u0632\u0627\u0645 \u0623\u0648 \u0627\u0644\u0636\u0631\u0648\u0631\u0629 \u0627\u0644\u0642\u0648\u064A\u0629\u060C \u0648\u064A\u0623\u062A\u064A \u0628\u0639\u062F\u0647 \u0627\u0644\u0641\u0639\u0644 \u062F\u0627\u0626\u0645\u0627\u064B \u0641\u064A \u0627\u0644\u0645\u0635\u062F\u0631 \u062F\u0648\u0646 \u0625\u0636\u0627\u0641\u0627\u062A."
     },
     {
       sentence: "The train will arrive at five oclock",
+      translation: "\u0633\u064A\u0635\u0644 \u0627\u0644\u0642\u0637\u0627\u0631 \u0641\u064A \u0627\u0644\u0633\u0627\u0639\u0629 \u0627\u0644\u062E\u0627\u0645\u0633\u0629",
       tip: "\u0646\u0633\u062A\u062E\u062F\u0645 (will) \u0644\u0644\u062A\u0646\u0628\u0624 \u0623\u0648 \u0627\u0644\u062A\u0639\u0628\u064A\u0631 \u0639\u0646 \u0623\u062D\u062F\u0627\u062B \u0645\u0633\u062A\u0642\u0628\u0644\u064A\u0629\u060C \u0648\u0646\u0633\u062A\u062E\u062F\u0645 \u062D\u0631\u0641 \u0627\u0644\u062C\u0631 (at) \u062F\u0627\u0626\u0645\u0627\u064B \u0644\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0648\u0642\u062A \u0648\u0627\u0644\u0633\u0627\u0639\u0629."
     },
     {
       sentence: "This smartphone is better than my old phone",
+      translation: "\u0647\u0630\u0627 \u0627\u0644\u0647\u0627\u062A\u0641 \u0627\u0644\u0630\u0643\u064A \u0623\u0641\u0636\u0644 \u0645\u0646 \u0647\u0627\u062A\u0641\u064A \u0627\u0644\u0642\u062F\u064A\u0645",
       tip: "\u0641\u064A \u0627\u0644\u0645\u0642\u0627\u0631\u0646\u0629 \u0628\u064A\u0646 \u0634\u064A\u0626\u064A\u0646\u060C \u0646\u0633\u062A\u062E\u062F\u0645 \u0635\u064A\u063A\u0629 \u0627\u0644\u0635\u0641\u0629 \u0627\u0644\u0645\u0642\u0627\u0631\u0646\u0629 (better) \u0645\u062A\u0628\u0648\u0639\u0629 \u0628\u0640 (than) \u0644\u0625\u0638\u0647\u0627\u0631 \u0627\u0644\u062A\u0641\u0636\u064A\u0644."
     },
     {
       sentence: "If it rains we will stay home",
+      translation: "\u0625\u0630\u0627 \u0623\u0645\u0637\u0631\u062A \u0633\u0646\u0628\u0642\u0649 \u0641\u064A \u0627\u0644\u0645\u0646\u0632\u0644",
       tip: "\u0641\u064A \u0627\u0644\u062D\u0627\u0644\u0629 \u0627\u0644\u0634\u0631\u0637\u064A\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 (First Conditional)\u060C \u0646\u0633\u062A\u062E\u062F\u0645 \u0645\u0636\u0627\u0631\u0639 \u0628\u0633\u064A\u0637 \u0641\u064A \u0634\u0642 \u0627\u0644\u0634\u0631\u0637 \u0648\u0645\u0633\u062A\u0642\u0628\u0644 \u0628\u0640 (will) \u0641\u064A \u062C\u0648\u0627\u0628 \u0627\u0644\u0634\u0631\u0637."
     },
     {
       sentence: "Learning English opens many great opportunities",
+      translation: "\u062A\u0639\u0644\u0645 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u064A\u0641\u062A\u062D \u0627\u0644\u0639\u062F\u064A\u062F \u0645\u0646 \u0627\u0644\u0641\u0631\u0635 \u0627\u0644\u0639\u0638\u064A\u0645\u0629",
       tip: "\u0627\u0644\u0641\u0639\u0644 \u0627\u0644\u0645\u0646\u062A\u0647\u064A \u0628\u0640 ing \u0647\u0646\u0627 (Learning) \u064A\u0639\u0645\u0644 \u0643\u0627\u0633\u0645 (Gerund) \u0648\u064A\u0639\u062A\u0628\u0631 \u0641\u0627\u0639\u0644 \u0627\u0644\u062C\u0645\u0644\u0629\u060C \u0648\u0627\u0644\u0635\u0641\u0629 (great) \u062A\u0633\u0628\u0642 \u0627\u0644\u0645\u0648\u0635\u0648\u0641."
     },
     {
       sentence: "He is interested in learning new skills",
+      translation: "\u0647\u0648 \u0645\u0647\u062A\u0645 \u0628\u062A\u0639\u0644\u0645 \u0645\u0647\u0627\u0631\u0627\u062A \u062C\u062F\u064A\u062F\u0629",
       tip: "\u0627\u0644\u062A\u0639\u0628\u064A\u0631 (interested in) \u064A\u0623\u062A\u064A \u0628\u0639\u062F\u0647 \u062F\u0627\u0626\u0645\u0627\u064B \u0627\u0633\u0645 \u0623\u0648 \u0641\u0639\u0644 \u0645\u0646\u062A\u0647\u064A \u0628\u0640 (ing) \u0644\u0644\u062A\u0639\u0628\u064A\u0631 \u0639\u0646 \u0627\u0644\u0647\u0648\u0627\u064A\u0627\u062A \u0648\u0627\u0644\u0627\u0647\u062A\u0645\u0627\u0645\u0627\u062A."
     },
     {
       sentence: "She prefers tea instead of hot coffee",
+      translation: "\u0647\u064A \u062A\u0641\u0636\u0644 \u0627\u0644\u0634\u0627\u064A \u0628\u062F\u0644\u0627\u064B \u0645\u0646 \u0627\u0644\u0642\u0647\u0648\u0629 \u0627\u0644\u0633\u0627\u062E\u0646\u0629",
       tip: "\u0646\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u062A\u0639\u0628\u064A\u0631 (instead of) \u0644\u0644\u062D\u062F\u064A\u062B \u0639\u0646 \u0627\u0644\u0628\u062F\u0627\u0626\u0644 \u0648\u062A\u0639\u0646\u064A (\u0628\u062F\u0644\u0627\u064B \u0645\u0646)\u060C \u0648\u064A\u062A\u0628\u0639\u0647\u0627 \u0627\u0644\u0627\u0633\u0645 \u0645\u0628\u0627\u0634\u0631\u0629."
     },
     {
       sentence: "We should protect our environment from pollution",
+      translation: "\u064A\u0646\u0628\u063A\u064A \u0639\u0644\u064A\u0646\u0627 \u062D\u0645\u0627\u064A\u0629 \u0628\u064A\u0626\u062A\u0646\u0627 \u0645\u0646 \u0627\u0644\u062A\u0644\u0648\u062B",
       tip: "\u0627\u0644\u0641\u0639\u0644 \u0627\u0644\u0645\u0633\u0627\u0639\u062F (should) \u064A\u0641\u064A\u062F \u062A\u0642\u062F\u064A\u0645 \u0627\u0644\u0646\u0635\u064A\u062D\u0629 \u0627\u0644\u0623\u062E\u0644\u0627\u0642\u064A\u0629 \u0623\u0648 \u0627\u0644\u0639\u0627\u0645\u0629\u060C \u0648\u064A\u062A\u0628\u0639\u0647 \u0627\u0644\u0645\u0635\u062F\u0631 \u0645\u062C\u0631\u062F\u0627\u064B \u0645\u0646 \u0623\u064A \u0644\u0648\u0627\u062D\u0642."
     },
     {
       sentence: "The children are playing happily in the garden",
+      translation: "\u0627\u0644\u0623\u0637\u0641\u0627\u0644 \u064A\u0644\u0639\u0628\u0648\u0646 \u0628\u0633\u0639\u0627\u062F\u0629 \u0641\u064A \u0627\u0644\u062D\u062F\u064A\u0642\u0629",
       tip: "\u0635\u064A\u063A\u0629 \u0627\u0644\u062C\u0645\u0639 \u0644\u0644\u0627\u0633\u0645 \u0627\u0644\u0634\u0627\u0630 (children) \u0644\u0627 \u062A\u0623\u062E\u0630 \u062D\u0631\u0641 s\u060C \u0648\u0627\u0644\u062D\u0627\u0644 (happily) \u064A\u0635\u0641 \u0637\u0631\u064A\u0642\u0629 \u0644\u0639\u0628 \u0627\u0644\u0623\u0637\u0641\u0627\u0644 \u0628\u0645\u0631\u062D \u0648\u0633\u0639\u0627\u062F\u0629."
     },
     {
       sentence: "Could you repeat that sentence more slowly please",
+      translation: "\u0647\u0644 \u064A\u0645\u0643\u0646\u0643 \u062A\u0643\u0631\u0627\u0631 \u0647\u0630\u0647 \u0627\u0644\u062C\u0645\u0644\u0629 \u0628\u0628\u0637\u0621 \u0623\u0643\u062B\u0631 \u0645\u0646 \u0641\u0636\u0644\u0643",
       tip: "\u0627\u0644\u0637\u0644\u0628 \u0628\u0640 (Could you) \u064A\u0639\u062A\u0628\u0631 \u0645\u0646 \u0623\u0643\u062B\u0631 \u0627\u0644\u0623\u0633\u0627\u0644\u064A\u0628 \u0623\u062F\u0628\u0627\u064B \u0648\u0644\u0628\u0627\u0642\u0629 \u0641\u064A \u0627\u0644\u0644\u063A\u0629 \u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0644\u0644\u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0627\u0644\u0631\u0633\u0645\u064A\u0629 \u0648\u0627\u0644\u064A\u0648\u0645\u064A\u0629."
     },
     {
       sentence: "He decided to buy a new laptop for work",
+      translation: "\u0642\u0631\u0631 \u0634\u0631\u0627\u0621 \u0643\u0645\u0628\u064A\u0648\u062A\u0631 \u0645\u062D\u0645\u0648\u0644 \u062C\u062F\u064A\u062F \u0644\u0644\u0639\u0645\u0644",
       tip: "\u0627\u0644\u0641\u0639\u0644 (decide) \u064A\u062A\u0628\u0639\u0647 \u062F\u0627\u0626\u0645\u0627\u064B \u062D\u0631\u0641 \u0627\u0644\u062C\u0631 (to) \u062B\u0645 \u0627\u0644\u0641\u0639\u0644 \u0641\u064A \u0627\u0644\u0645\u0635\u062F\u0631 (decide to do) \u0644\u0644\u062A\u0639\u0628\u064A\u0631 \u0639\u0646 \u0627\u062A\u062E\u0627\u0630 \u0627\u0644\u0642\u0631\u0627\u0631."
     },
     {
       sentence: "They went to the museum to see the ancient statues",
+      translation: "\u0630\u0647\u0628\u0648\u0627 \u0625\u0644\u0649 \u0627\u0644\u0645\u062A\u062D\u0641 \u0644\u0631\u0624\u064A\u0629 \u0627\u0644\u062A\u0645\u0627\u062B\u064A\u0644 \u0627\u0644\u0642\u062F\u064A\u0645\u0629",
       tip: "\u0646\u0633\u062A\u062E\u062F\u0645 \u0635\u064A\u063A\u0629 \u0627\u0644\u0645\u0635\u062F\u0631 \u0644\u0644\u063A\u0631\u0636 (Infinitive of Purpose) \u0644\u0644\u062A\u0639\u0628\u064A\u0631 \u0639\u0646 \u0633\u0628\u0628 \u0627\u0644\u0630\u0647\u0627\u0628 \u0623\u0648 \u0627\u0644\u0642\u064A\u0627\u0645 \u0628\u0634\u064A\u0621 \u0648\u062A\u0639\u0646\u064A (\u0644\u0643\u064A)."
     }
   ];
@@ -23793,7 +23862,7 @@
       sh = [...words].sort(() => Math.random() - 0.5);
       attempts++;
     }
-    sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence };
+    sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence, translation: item.translation || "" };
     sb.answered = false;
     sb.timeLeft = sb.timePerSentence;
     renderRoundLayout2(mount);
@@ -23828,6 +23897,12 @@
       <!-- \u0645\u0624\u0642\u062A \u0634\u0631\u064A\u0637 \u0627\u0644\u062A\u0642\u062F\u0645 \u0627\u0644\u0641\u062E\u0645 -->
       <div class="sb-timer-track-bar">
         <div class="sb-timer-fill-bar" id="sb-timer-fill-el"></div>
+      </div>
+
+      <!-- \u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0627\u0644\u0645\u0633\u062A\u0647\u062F\u0641\u0629 (\u062A\u0644\u0645\u064A\u062D \u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0625\u062C\u0628\u0627\u0631\u064A) -->
+      <div style="background: linear-gradient(135deg, var(--primary-glow) 0%, var(--bg-tertiary) 100%); border: 1.5px solid var(--primary); border-radius: 16px; padding: 16px; width: 100%; text-align: center; margin-bottom: 20px; box-shadow: var(--card-shadow-3d); direction: rtl;">
+        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">\u0627\u0644\u062A\u0631\u062C\u0645\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0644\u0644\u062C\u0645\u0644\u0629 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629:</div>
+        <div style="font-size: 1.35rem; color: var(--primary); font-weight: 800; line-height: 1.4;">${sb.current.translation || "\u062A\u0631\u062C\u0645\u0629 \u063A\u064A\u0631 \u0645\u062A\u0648\u0641\u0631\u0629"}</div>
       </div>
 
       <!-- \u0644\u0641\u0627\u0641\u0629 \u0627\u0644\u0628\u0631\u062F\u064A \u0644\u062A\u0639\u0644\u064A\u0645\u0627\u062A \u0627\u0644\u0644\u0639\u0628\u0629 -->
@@ -24119,10 +24194,16 @@
       const dialogueLines = lesson.dialogue?.lines || lesson.dialogue?.exchanges || [];
       dialogueLines.forEach((line) => {
         const text = line.text || line.english || line.en || line.line;
+        const translation = line.translation || line.arabic || line.ar || line.arabicText || "";
         if (text) {
           const cleanedText = text.trim();
           if (cleanedText.split(" ").length >= 4) {
-            pool.push({ sentence: cleanedText, lessonId: lesson.id, unitId: lesson.unitId });
+            pool.push({
+              sentence: cleanedText,
+              translation: translation.trim(),
+              lessonId: lesson.id,
+              unitId: lesson.unitId
+            });
           }
         }
       });
@@ -24134,10 +24215,16 @@
       ];
       exercisesList.forEach((ex) => {
         const text = ex.sentence || ex.question || ex.text;
+        const translation = ex.translation || ex.arabic || ex.ar || ex.answerTranslation || "";
         if (text) {
           const cleanedText = text.replace(/[.?]/g, "").trim();
           if (cleanedText.split(" ").length >= 4) {
-            pool.push({ sentence: cleanedText, lessonId: lesson.id, unitId: lesson.unitId });
+            pool.push({
+              sentence: cleanedText,
+              translation: translation.trim(),
+              lessonId: lesson.id,
+              unitId: lesson.unitId
+            });
           }
         }
       });
@@ -24282,7 +24369,8 @@
       selectedUnits: levelData.units.map((u) => u.id),
       selectedLessons: levelData.curriculum.map((l) => l.id),
       difficulty: game.difficulty.toLowerCase(),
-      sound: isSoundEnabled()
+      sound: isSoundEnabled(),
+      hangmanMode: "words"
     };
     function updateSetupUI() {
       const mainMount = document.getElementById("gc-game-mount");
@@ -24302,9 +24390,9 @@
       }
       const vocabPool = buildVocabPool(lessonIds);
       const sentencePool = buildSentencePool(lessonIds);
-      const isVocabGame = GAME_REQS[game.id].vocab > 0;
+      const isVocabGame = game.id === "hangman" ? setupState.hangmanMode === "words" : GAME_REQS[game.id].vocab > 0;
       const poolSize = isVocabGame ? vocabPool.length : sentencePool.length;
-      const reqSize = isVocabGame ? GAME_REQS[game.id].vocab : GAME_REQS[game.id].sentences;
+      const reqSize = game.id === "hangman" ? setupState.hangmanMode === "words" ? 3 : 2 : isVocabGame ? GAME_REQS[game.id].vocab : GAME_REQS[game.id].sentences;
       const isValid = poolSize >= reqSize;
       const tabHTML = `
       <div class="gc-setup-tabs">
@@ -24419,7 +24507,31 @@
         </label>
       </div>
     `;
-      const validationHTML = isValid ? `<div class="gc-setup-valid-badge">\u2713 \u062A\u0645 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u062D\u062A\u0648\u0649 \u0645\u0646\u0627\u0633\u0628: \u062A\u0645 \u062A\u062D\u062F\u064A\u062F <strong>${poolSize}</strong> ${isVocabGame ? "\u0643\u0644\u0645\u0629" : "\u062C\u0645\u0644\u0629"} (\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0627\u0644\u0645\u0637\u0644\u0648\u0628 ${reqSize}).</div>` : `<div class="gc-setup-invalid-badge">\u26A0\uFE0F \u0645\u062D\u062A\u0648\u0649 \u063A\u064A\u0631 \u0643\u0627\u0641\u064D \u0644\u0644\u0639\u0628: \u064A\u062D\u062A\u0648\u064A \u0627\u0644\u0646\u0637\u0627\u0642 \u0627\u0644\u0645\u062E\u062A\u0627\u0631 \u0639\u0644\u0649 <strong>${poolSize}</strong> \u0641\u0642\u0637\u060C \u0628\u064A\u0646\u0645\u0627 \u062A\u062A\u0637\u0644\u0628 \u0627\u0644\u0644\u0639\u0628\u0629 ${GAME_REQS[game.id].label} \u0643\u062D\u062F \u0623\u062F\u0646\u0649. \u0627\u0644\u0631\u062C\u0627\u0621 \u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0645\u0632\u064A\u062F \u0645\u0646 \u0627\u0644\u062F\u0631\u0648\u0633.</div>`;
+      const validationHTML = isValid ? `<div class="gc-setup-valid-badge">\u2713 \u062A\u0645 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u062D\u062A\u0648\u0649 \u0645\u0646\u0627\u0633\u0628: \u062A\u0645 \u062A\u062D\u062F\u064A\u062F <strong>${poolSize}</strong> ${isVocabGame ? "\u0643\u0644\u0645\u0629" : "\u062C\u0645\u0644\u0629"} (\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0627\u0644\u0645\u0637\u0644\u0648\u0628 ${reqSize}).</div>` : `<div class="gc-setup-invalid-badge">\u26A0\uFE0F \u0645\u062D\u062A\u0648\u0649 \u063A\u064A\u0631 \u0643\u0627\u0641\u064D \u0644\u0644\u0639\u0628: \u064A\u062D\u062A\u0648\u064A \u0627\u0644\u0646\u0637\u0627\u0642 \u0627\u0644\u0645\u062E\u062A\u0627\u0631 \u0639\u0644\u0649 <strong>${poolSize}</strong> \u0641\u0642\u0637\u060C \u0628\u064A\u0646\u0645\u0627 \u062A\u062A\u0637\u0644\u0628 \u0627\u0644\u0644\u0639\u0628\u0629 ${game.id === "hangman" ? setupState.hangmanMode === "words" ? "3 \u0643\u0644\u0645\u0627\u062A \u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629" : "\u062C\u0645\u0644\u062A\u064A\u0646 \u0643\u0627\u0645\u0644\u062A\u064A\u0646" : GAME_REQS[game.id].label} \u0643\u062D\u062F \u0623\u062F\u0646\u0649. \u0627\u0644\u0631\u062C\u0627\u0621 \u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0645\u0632\u064A\u062F \u0645\u0646 \u0627\u0644\u062F\u0631\u0648\u0633.</div>`;
+      let hangmanOptionsHTML = "";
+      if (game.id === "hangman") {
+        hangmanOptionsHTML = `
+        <div class="gc-setup-difficulty-section" style="margin-bottom: 20px;">
+          <label class="gc-setup-section-lbl">\u0646\u0648\u0639 \u0627\u0644\u0645\u062D\u062A\u0648\u0649 \u0627\u0644\u0645\u0633\u062A\u0647\u062F\u0641 \u0644\u0644\u0639\u0628:</label>
+          <div class="gc-setup-diff-cards">
+            <div class="gc-setup-diff-card ${setupState.hangmanMode === "words" ? "active" : ""}" data-hm-mode="words" style="--card-border-color: var(--primary);">
+              <div class="gc-diff-dot"></div>
+              <div class="gc-diff-details">
+                <span class="gc-diff-name" style="color: var(--primary);">\u0643\u0644\u0645\u0627\u062A \u0645\u0641\u0631\u062F\u0629 (Words)</span>
+                <span class="gc-diff-desc">\u062A\u062E\u0645\u064A\u0646 \u0643\u0644\u0645\u0627\u062A \u0645\u0641\u0631\u062F\u0629 \u0645\u0646 \u0627\u0644\u062F\u0631\u0648\u0633 \u0627\u0644\u0645\u062D\u062F\u062F\u0629.</span>
+              </div>
+            </div>
+            <div class="gc-setup-diff-card ${setupState.hangmanMode === "sentences" ? "active" : ""}" data-hm-mode="sentences" style="--card-border-color: var(--accent);">
+              <div class="gc-diff-dot"></div>
+              <div class="gc-diff-details">
+                <span class="gc-diff-name" style="color: var(--accent);">\u062C\u0645\u0644 \u0643\u0627\u0645\u0644\u0629 (Sentences)</span>
+                <span class="gc-diff-desc">\u062A\u062E\u0645\u064A\u0646 \u062C\u0645\u0644 \u0643\u0627\u0645\u0644\u0629 \u0645\u0633\u062A\u062E\u0631\u062C\u0629 \u0645\u0646 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0627\u062A \u0648\u0627\u0644\u062A\u0645\u0627\u0631\u064A\u0646.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      }
       mainMount.innerHTML = `
       <div class="gc-setup-container">
         <div class="gc-setup-header">
@@ -24432,6 +24544,7 @@
 
         ${tabHTML}
         ${selectorHTML}
+        ${hangmanOptionsHTML}
         ${difficultyHTML}
         ${soundHTML}
         ${validationHTML}
@@ -24499,6 +24612,12 @@
           updateSetupUI();
         });
       }
+      mainMount.querySelectorAll("[data-hm-mode]").forEach((card) => {
+        card.addEventListener("click", () => {
+          setupState.hangmanMode = card.dataset.hmMode;
+          updateSetupUI();
+        });
+      });
       mainMount.querySelectorAll(".gc-setup-diff-card").forEach((card) => {
         card.addEventListener("click", () => {
           setupState.difficulty = card.dataset.diff;
@@ -24521,6 +24640,7 @@
             vocabPool,
             sentencePool,
             difficulty: setupState.difficulty,
+            hangmanMode: setupState.hangmanMode,
             onWin: (score) => {
               saveGameScore(game.id, score);
               const mults = { easy: 1, medium: 1.2, hard: 1.5 };

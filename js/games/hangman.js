@@ -537,12 +537,27 @@ let state = {};
 let _physicalKeyListener = null;
 let _canvasAnimFrame = null;
 
-function resetState(wordObj, difficulty) {
+function resetState(wordObj, difficulty, hangmanMode) {
   const maxWrongs = { easy: 8, medium: 6, hard: 4 };
   const maxWrong = maxWrongs[difficulty] || 6;
+  const mode = hangmanMode || 'words';
+  
+  let rawText = '';
+  let arabicHint = '';
+  
+  if (mode === 'words') {
+    rawText = wordObj.english || wordObj.word || '';
+    rawText = rawText.toUpperCase().replace(/[^A-Z]/g, '');
+    arabicHint = wordObj.arabic || wordObj.translation || '';
+  } else {
+    rawText = wordObj.sentence || wordObj.english || wordObj.word || '';
+    rawText = rawText.toUpperCase().replace(/[^A-Z\s]/g, '').replace(/\s+/g, ' ').trim();
+    arabicHint = wordObj.translation || wordObj.arabic || '';
+  }
+
   state = {
-    word: wordObj.english.toUpperCase().replace(/[^A-Z]/g, ''),
-    arabicHint: wordObj.arabic,
+    word: rawText,
+    arabicHint: arabicHint,
     guessed: new Set(),
     wrong: 0,
     maxWrong,
@@ -553,10 +568,15 @@ function resetState(wordObj, difficulty) {
     difficulty,
     roundNum: 0,
     totalScore: 0,
+    hangmanMode: mode
   };
+
+  if (mode === 'sentences') {
+    state.guessed.add(' ');
+  }
 }
 
-export function playHangman(mount, { vocabPool, onWin, difficulty }) {
+export function playHangman(mount, { vocabPool, sentencePool, onWin, difficulty, hangmanMode }) {
   injectStyles();
   
   // تسجيل دالة تنظيف اللعبة لإيقافها فوراً عند الخروج
@@ -568,34 +588,45 @@ export function playHangman(mount, { vocabPool, onWin, difficulty }) {
     stopParticleSystem();
   };
 
-  if (!vocabPool || vocabPool.length === 0) {
+  const mode = hangmanMode || 'words';
+  const pool = mode === 'words' ? (vocabPool || []) : (sentencePool || []);
+
+  if (pool.length === 0) {
     mount.innerHTML = `
       <div class="gc-error" style="font-family:'Tajawal', sans-serif;">
-        ⚠️ لا توجد مفردات متاحة في الدروس المحددة. يرجى اختيار دروس إضافية!
+        ⚠️ لا توجد محتويات متاحة في الدروس المحددة للعب بهذا النمط.
       </div>`;
     return;
   }
   const diff = difficulty || 'medium';
-  startRound(mount, vocabPool, onWin, 0, 0, diff);
+  startRound(mount, pool, onWin, 0, 0, diff, mode);
 }
 
-function startRound(mount, pool, onWin, roundNum, totalScore, difficulty) {
+function startRound(mount, pool, onWin, roundNum, totalScore, difficulty, hangmanMode) {
+  const mode = hangmanMode || 'words';
   const eligible = pool.filter(v => {
-    const clean = v.english.toUpperCase().replace(/[^A-Z]/g, '');
-    return clean.length >= 3 && clean.length <= 14;
+    if (mode === 'words') {
+      const text = v.english || v.word || '';
+      const clean = text.toUpperCase().replace(/[^A-Z]/g, '');
+      return clean.length >= 3 && clean.length <= 14;
+    } else {
+      const text = v.sentence || v.english || v.word || '';
+      const clean = text.toUpperCase().replace(/[^A-Z\s]/g, '').replace(/\s+/g, ' ').trim();
+      return clean.length >= 5 && clean.length <= 35;
+    }
   });
 
   if (eligible.length === 0) {
     mount.innerHTML = `
       <div class="gc-error" style="font-family:'Tajawal', sans-serif;">
-        ⚠️ لا توجد كلمات مطابقة للشروط في الدروس المحددة.
+        ⚠️ لا توجد جمل أو كلمات مطابقة للشروط في الدروس المحددة.
       </div>`;
     return;
   }
 
   // اختيار كلمة عشوائية
   const wordObj = eligible[Math.floor(Math.random() * eligible.length)];
-  resetState(wordObj, difficulty);
+  resetState(wordObj, difficulty, mode);
   state.roundNum = roundNum;
   state.totalScore = totalScore;
 
@@ -609,6 +640,7 @@ function startRound(mount, pool, onWin, roundNum, totalScore, difficulty) {
 function renderGameLayout(mount, pool, onWin) {
   const hintCostHTML = state.difficulty === 'easy' ? 'مجاني' : '-5 نقاط';
   const isHard = state.difficulty === 'hard';
+  const isSentence = state.hangmanMode === 'sentences';
 
   mount.innerHTML = `
     <div class="hm-premium-container" id="hm-premium-root">
@@ -630,7 +662,7 @@ function renderGameLayout(mount, pool, onWin) {
       <!-- لفافة البردي للمساعدة والتعليمات -->
       <div class="hm-parchment-scroll">
         <div class="hm-parchment-title">📜 دليل الصمود اللغوي:</div>
-        تم اختيار كلمة باللغة الإنجليزية من دروسك. خمن الحروف لتنقذ صديقك! الإجابة السريعة والخالية من الأخطاء تمنحك نقاطاً مضاعفة.
+        تم اختيار ${isSentence ? 'جملة كاملة' : 'كلمة مفردة'} باللغة الإنجليزية من دروسك. خمن الحروف لتنقذ صديقك! الإجابة السريعة والخالية من الأخطاء تمنحك نقاطاً مضاعفة.
       </div>
 
       <!-- الجسم الأساسي المقسم لعمودين -->
@@ -648,7 +680,7 @@ function renderGameLayout(mount, pool, onWin) {
             </div>
           ` : `
             <button class="hm-hint-action-btn" id="hm-premium-hint-btn">
-              <span>💡 طلب تلميح مرادف بالعربية</span>
+              <span>💡 ${isSentence ? 'طلب ترجمة الجملة بالعربية' : 'طلب تلميح مرادف بالعربية'}</span>
               <span style="font-size:0.8rem; background:var(--bg-primary); padding:2px 8px; border-radius:6px; margin-right:6px; color:var(--text-muted); border:1px solid var(--border-color);">(${hintCostHTML})</span>
             </button>
           `}
@@ -656,11 +688,11 @@ function renderGameLayout(mount, pool, onWin) {
 
         <!-- العمود الأيمن: الكلمة والـ Keyboard -->
         <div class="hm-word-panel">
-          <div class="hm-word-slots" id="hm-slots-container">
+          <div class="hm-word-slots" id="hm-slots-container" style="width: 100%; display: flex; flex-wrap: wrap; justify-content: center;">
             ${renderWordSlots()}
           </div>
           <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-4px;">
-            تتكون الكلمة من <strong>${state.word.length}</strong> حروف (Letters)
+            يتكون اللغز من <strong>${state.word.length}</strong> ${isSentence ? 'حرفاً ورمزاً (Characters)' : 'حروف (Letters)'}
           </p>
 
           <!-- الكيبورد الميكانيكي -->
@@ -868,15 +900,34 @@ function renderHearts() {
 }
 
 function renderWordSlots() {
-  return state.word.split('').map(letter => {
-    const isRevealed = state.guessed.has(letter);
-    return `
-      <span class="hm-letter-slot ${isRevealed ? 'revealed' : ''}">
-        <span class="hm-letter-char">${letter}</span>
-        <span class="hm-letter-underline"></span>
-      </span>
-    `;
-  }).join('');
+  if (state.hangmanMode === 'sentences') {
+    const wordsArray = state.word.split(' ');
+    return wordsArray.map(word => {
+      return `
+        <div class="hm-word-group" style="display: inline-flex; gap: 6px; margin: 4px 6px; flex-wrap: nowrap;">
+          ${word.split('').map(letter => {
+            const isRevealed = state.guessed.has(letter);
+            return `
+              <span class="hm-letter-slot ${isRevealed ? 'revealed' : ''}" style="width: 26px; height: 36px; font-size: 1.25rem;">
+                <span class="hm-letter-char">${letter}</span>
+                <span class="hm-letter-underline" style="height: 2px;"></span>
+              </span>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }).join('');
+  } else {
+    return state.word.split('').map(letter => {
+      const isRevealed = state.guessed.has(letter);
+      return `
+        <span class="hm-letter-slot ${isRevealed ? 'revealed' : ''}">
+          <span class="hm-letter-char">${letter}</span>
+          <span class="hm-letter-underline"></span>
+        </span>
+      `;
+    }).join('');
+  }
 }
 
 // ==========================================
@@ -1053,12 +1104,14 @@ function showWinOverlay(mount, pool, onWin) {
   const overlay = mount.querySelector('#hm-premium-overlay');
   if (!overlay) return;
 
+  const isSentence = state.hangmanMode === 'sentences';
+
   overlay.style.display = 'flex';
   overlay.innerHTML = `
     <div class="hm-result-window">
       <div class="hm-res-badge">🎉</div>
       <h2 class="hm-res-title win">أحسنت! إجابة صحيحة</h2>
-      <p class="hm-res-word-reveal">الكلمة المكتشفة هي: <strong>${state.word}</strong></p>
+      <p class="hm-res-word-reveal">${isSentence ? 'الجملة المكتشفة هي' : 'الكلمة المكتشفة هي'}: <strong>${state.word}</strong></p>
       
       <div style="background:rgba(255,255,255,0.03); border:1px dashed var(--border-color); border-radius:12px; padding:12px; margin-bottom:18px;">
         <span style="color:var(--text-muted); font-size:0.85rem; display:block; margin-bottom:4px;">الترجمة والرديف بالعربية:</span>
@@ -1078,7 +1131,7 @@ function showWinOverlay(mount, pool, onWin) {
 
       <div class="hm-action-row">
         <button class="btn btn-primary" id="hm-next-round-btn" style="padding:10px 24px; font-weight:700;">
-          الكلمة التالية →
+          ${isSentence ? 'الجملة التالية ←' : 'الكلمة التالية →'}
         </button>
         <button class="btn btn-secondary" id="hm-quit-btn" style="padding:10px 20px;">
           خروج للألعاب
@@ -1090,7 +1143,7 @@ function showWinOverlay(mount, pool, onWin) {
   // ربط الأزرار
   overlay.querySelector('#hm-next-round-btn').addEventListener('click', () => {
     stopParticleSystem();
-    startRound(mount, pool, onWin, state.roundNum + 1, state.totalScore, state.difficulty);
+    startRound(mount, pool, onWin, state.roundNum + 1, state.totalScore, state.difficulty, state.hangmanMode);
   });
   overlay.querySelector('#hm-quit-btn').addEventListener('click', () => {
     stopParticleSystem();
@@ -1109,12 +1162,14 @@ function showLoseOverlay(mount, pool, onWin) {
   const overlay = mount.querySelector('#hm-premium-overlay');
   if (!overlay) return;
 
+  const isSentence = state.hangmanMode === 'sentences';
+
   overlay.style.display = 'flex';
   overlay.innerHTML = `
     <div class="hm-result-window">
       <div class="hm-res-badge">💀</div>
       <h2 class="hm-res-title lose">حظ أوفر! لم تنجح</h2>
-      <p class="hm-res-word-reveal">الكلمة الصحيحة كانت: <strong>${state.word}</strong></p>
+      <p class="hm-res-word-reveal">${isSentence ? 'الجملة الصحيحة كانت' : 'الكلمة الصحيحة كانت'}: <strong>${state.word}</strong></p>
       
       <div style="background:rgba(255,255,255,0.03); border:1px dashed var(--border-color); border-radius:12px; padding:12px; margin-bottom:18px;">
         <span style="color:var(--text-muted); font-size:0.85rem; display:block; margin-bottom:4px;">الترجمة الصحيحة:</span>
@@ -1142,7 +1197,7 @@ function showLoseOverlay(mount, pool, onWin) {
   overlay.querySelector('#hm-retry-round-btn').addEventListener('click', () => {
     stopParticleSystem();
     // تصفير جولة الخسارة والبدء من جديد بنفس النقاط
-    startRound(mount, pool, onWin, state.roundNum, state.totalScore, state.difficulty);
+    startRound(mount, pool, onWin, state.roundNum, state.totalScore, state.difficulty, state.hangmanMode);
   });
   overlay.querySelector('#hm-quit-btn2').addEventListener('click', () => {
     stopParticleSystem();

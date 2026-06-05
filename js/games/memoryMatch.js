@@ -270,6 +270,7 @@ function injectStyles() {
       }
       .mm-cards-grid {
         gap: 8px;
+        grid-template-columns: repeat(4, 1fr) !important;
       }
       .mm-card-face {
         padding: 6px;

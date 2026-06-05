@@ -12,82 +12,102 @@ const ROUNDS = 6;
 const FALLBACK_SENTENCES = [
   { 
     sentence: 'She is reading a very good book', 
+    translation: 'هي تقرأ كتاباً جيداً جداً',
     tip: 'الصفة (good) تسبق الاسم الموصوف (book) دائماً في اللغة الإنجليزية، ويسبقها الحال (very) لتقوية المعنى.' 
   },
   { 
     sentence: 'I would like to order some coffee', 
+    translation: 'أود أن أطلب بعض القهوة',
     tip: 'التعبير (would like) طريقة مهذبة للغاية لطلب الأشياء في المطاعم والمقاهي وتعني (أود أن) ويتبعها الفعل بالمصدر.' 
   },
   { 
     sentence: 'The weather today is quite beautiful', 
+    translation: 'الطقس اليوم جميل تماماً',
     tip: 'نضع الفعل المساعد (is) قبل الصفة (beautiful) لربط الجملة الاسمية، ويستخدم الظرف (quite) لتعديل درجة الصفة.' 
   },
   { 
     sentence: 'Can you help me find the library', 
+    translation: 'هل يمكنك مساعدتي في العثور على المكتبة',
     tip: 'السؤال بـ (Can you) هو الأسلوب الشائع لطلب المساعدة من الآخرين بطريقة ودية، ويتبعه الفعل بالمصدر مجرداً.' 
   },
   { 
     sentence: 'He speaks English very fluently', 
+    translation: 'هو يتحدث الإنجليزية بطلاقة شديدة',
     tip: 'الحال (fluently) ينتهي بـ ly ويأتي بعد الفعل والمفعول ليصف طريقة وأسلوب التحدث بطلاقة.' 
   },
   { 
     sentence: 'We are going to the market tomorrow', 
+    translation: 'نحن ذاهبون إلى السوق غداً',
     tip: 'التركيب (are going to) يستخدم للتعبير عن ترتيبات وخطط مستقبلية مؤكدة بناء على نوايا مسبقة.' 
   },
   { 
     sentence: 'They finished their homework before dinner', 
+    translation: 'لقد أنهوا واجباتهم المدرسية قبل العشاء',
     tip: 'الفعل (finished) في الماضي البسيط يعبر عن حدث انتهى تماماً في الماضي، ويتبعه حرف الجر الزمني (before).' 
   },
   { 
     sentence: 'My sister works at a big hospital', 
+    translation: 'أختي تعمل في مستشفى كبير',
     tip: 'حرف الجر (at) يستخدم للتعبير عن التواجد داخل مؤسسة أو مكان عمل محدد، وتسبق الصفة (big) الاسم الموصوف (hospital).' 
   },
   {
     sentence: 'You must study hard for the exams',
+    translation: 'يجب عليك المذاكرة بجد للامتحانات',
     tip: 'الفعل المساعد (must) يعبر عن الالتزام أو الضرورة القوية، ويأتي بعده الفعل دائماً في المصدر دون إضافات.'
   },
   {
     sentence: 'The train will arrive at five oclock',
+    translation: 'سيصل القطار في الساعة الخامسة',
     tip: 'نستخدم (will) للتنبؤ أو التعبير عن أحداث مستقبلية، ونستخدم حرف الجر (at) دائماً لتحديد الوقت والساعة.'
   },
   {
     sentence: 'This smartphone is better than my old phone',
+    translation: 'هذا الهاتف الذكي أفضل من هاتفي القديم',
     tip: 'في المقارنة بين شيئين، نستخدم صيغة الصفة المقارنة (better) متبوعة بـ (than) لإظهار التفضيل.'
   },
   {
     sentence: 'If it rains we will stay home',
+    translation: 'إذا أمطرت سنبقى في المنزل',
     tip: 'في الحالة الشرطية الأولى (First Conditional)، نستخدم مضارع بسيط في شق الشرط ومستقبل بـ (will) في جواب الشرط.'
   },
   {
     sentence: 'Learning English opens many great opportunities',
+    translation: 'تعلم الإنجليزية يفتح العديد من الفرص العظيمة',
     tip: 'الفعل المنتهي بـ ing هنا (Learning) يعمل كاسم (Gerund) ويعتبر فاعل الجملة، والصفة (great) تسبق الموصوف.'
   },
   {
     sentence: 'He is interested in learning new skills',
+    translation: 'هو مهتم بتعلم مهارات جديدة',
     tip: 'التعبير (interested in) يأتي بعده دائماً اسم أو فعل منتهي بـ (ing) للتعبير عن الهوايات والاهتمامات.'
   },
   {
     sentence: 'She prefers tea instead of hot coffee',
+    translation: 'هي تفضل الشاي بدلاً من القهوة الساخنة',
     tip: 'نستخدم التعبير (instead of) للحديث عن البدائل وتعني (بدلاً من)، ويتبعها الاسم مباشرة.'
   },
   {
     sentence: 'We should protect our environment from pollution',
+    translation: 'ينبغي علينا حماية بيئتنا من التلوث',
     tip: 'الفعل المساعد (should) يفيد تقديم النصيحة الأخلاقية أو العامة، ويتبعه المصدر مجرداً من أي لواحق.'
   },
   {
     sentence: 'The children are playing happily in the garden',
+    translation: 'الأطفال يلعبون بسعادة في الحديقة',
     tip: 'صيغة الجمع للاسم الشاذ (children) لا تأخذ حرف s، والحال (happily) يصف طريقة لعب الأطفال بمرح وسعادة.'
   },
   {
     sentence: 'Could you repeat that sentence more slowly please',
+    translation: 'هل يمكنك تكرار هذه الجملة ببطء أكثر من فضلك',
     tip: 'الطلب بـ (Could you) يعتبر من أكثر الأساليب أدباً ولباقة في اللغة الإنجليزية للمحادثات الرسمية واليومية.'
   },
   {
     sentence: 'He decided to buy a new laptop for work',
+    translation: 'قرر شراء كمبيوتر محمول جديد للعمل',
     tip: 'الفعل (decide) يتبعه دائماً حرف الجر (to) ثم الفعل في المصدر (decide to do) للتعبير عن اتخاذ القرار.'
   },
   {
     sentence: 'They went to the museum to see the ancient statues',
+    translation: 'ذهبوا إلى المتحف لرؤية التماثيل القديمة',
     tip: 'نستخدم صيغة المصدر للغرض (Infinitive of Purpose) للتعبير عن سبب الذهاب أو القيام بشيء وتعني (لكي).'
   }
 ];
@@ -592,7 +612,7 @@ function nextRound(mount) {
     attempts++;
   }
 
-  sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence };
+  sb.current = { words, shuffled: sh, answer: [], tip: item.tip, sentence: item.sentence, translation: item.translation || '' };
   sb.answered = false;
   sb.timeLeft = sb.timePerSentence;
 
@@ -633,6 +653,12 @@ function renderRoundLayout(mount) {
       <!-- مؤقت شريط التقدم الفخم -->
       <div class="sb-timer-track-bar">
         <div class="sb-timer-fill-bar" id="sb-timer-fill-el"></div>
+      </div>
+
+      <!-- الترجمة العربية المستهدفة (تلميح الترجمة الإجباري) -->
+      <div style="background: linear-gradient(135deg, var(--primary-glow) 0%, var(--bg-tertiary) 100%); border: 1.5px solid var(--primary); border-radius: 16px; padding: 16px; width: 100%; text-align: center; margin-bottom: 20px; box-shadow: var(--card-shadow-3d); direction: rtl;">
+        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">الترجمة العربية للجملة المطلوبة:</div>
+        <div style="font-size: 1.35rem; color: var(--primary); font-weight: 800; line-height: 1.4;">${sb.current.translation || 'ترجمة غير متوفرة'}</div>
       </div>
 
       <!-- لفافة البردي لتعليمات اللعبة -->
