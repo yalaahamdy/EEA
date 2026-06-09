@@ -57,6 +57,7 @@ export function startSession(questions, options) {
   window.toggleSessionSpeech = () => toggleSpeechRecognition();
   window.checkSpellingSession = () => checkSpellingAnswer();
   window.checkWritingSession = () => checkWritingAnswer();
+  window.checkVocabSpeakingSession = () => checkVocabSpeakingAnswer();
   window.sessionOnWritingInput = (val) => onWritingInput(val);
   window.sessionOnSpellingInput = (val) => onSpellingInput(val);
   window.sessionExit = () => {
@@ -108,7 +109,7 @@ function renderQuestion() {
         
         <!-- Active Question Area -->
         <div id="session-card-body"></div>
-
+ 
         <!-- Tutor Feedback Bubble -->
         <div id="session-tutor-feedback" class="quiz-explanation-hidden"></div>
 
@@ -202,6 +203,28 @@ function renderVocabCard(q, container) {
           </div>
         </div>
         <p id="session-status-text" class="vocab-status-text" style="font-size: 0.85rem; color: var(--text-muted);">Click mic and speak in English</p>
+        
+        <div class="review-actions-inline" style="display: flex; justify-content: center; gap: 10px; margin-top: 16px;">
+          <button class="btn btn-secondary btn-sm-padding btn-next-svg-adjust" onclick="window.sessionSpeakText('${v.word.replace(/'/g, "\\'")}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-left"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <span>Pronunciation Hint</span>
+          </button>
+          
+          <button class="btn btn-secondary btn-sm-padding btn-next-svg-adjust" onclick="document.getElementById('session-vocab-fallback-typing-div').classList.remove('review-hidden')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-left"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6.01" y2="8"></line><line x1="10" y1="8" x2="10.01" y2="8"></line><line x1="14" y1="8" x2="14.01" y2="8"></line><line x1="18" y1="8" x2="18.01" y2="8"></line><line x1="6" y1="12" x2="6.01" y2="12"></line><line x1="18" y1="12" x2="18.01" y2="12"></line><line x1="7" y1="16" x2="17" y2="16"></line></svg>
+            <span>Typing Fallback</span>
+          </button>
+        </div>
+
+        <div id="session-vocab-fallback-typing-div" class="review-fallback-typing-box review-hidden" style="margin-top: 16px; max-width: 450px; margin-left: auto; margin-right: auto;">
+          <div class="vocab-input-wrapper" style="display: flex; gap: 8px;">
+            <input type="text" id="session-vocab-fallback-input" class="speaking-fallback-input" placeholder="Type the English word..." 
+                   onkeydown="if(event.key==='Enter' && !window.answered) window.checkVocabSpeakingSession()" style="margin: 0; text-align: left;">
+            <button class="btn btn-primary btn-next-svg-adjust" onclick="window.checkVocabSpeakingSession()">
+              <span>Submit</span>
+            </button>
+          </div>
+        </div>
       </div>
     `;
     actionBtn.onclick = () => window.toggleSessionSpeech();
@@ -608,6 +631,23 @@ function checkWritingAnswer() {
       const hint = getSentenceSpellingFeedback(typedSentence, correctSentence);
       handleIncorrectAnswer(feedbackBox, hint, inputEl);
     }
+  }
+}
+
+function checkVocabSpeakingAnswer() {
+  const q = sessionQuestions[sessionIndex];
+  const feedbackBox = document.getElementById("session-tutor-feedback");
+  const inputEl = document.getElementById("session-vocab-fallback-input");
+  if (!feedbackBox || !inputEl) return;
+
+  const val = inputEl.value.trim().toLowerCase();
+  const ans = q.data.word.toLowerCase().trim();
+
+  if (val === ans) {
+    handleCorrectAnswer(feedbackBox, inputEl);
+  } else {
+    const hint = getWordSpellingFeedback(val, ans);
+    handleIncorrectAnswer(feedbackBox, hint, inputEl);
   }
 }
 
