@@ -6,8 +6,13 @@
     if (fn) return fn();
     throw new Error("Module not found in bundle: " + path);
   };
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  var __esm = (fn, res, err) => function __init() {
+    if (err) throw err[0];
+    try {
+      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+    } catch (e) {
+      throw err = [e], e;
+    }
   };
   var __export = (target, all) => {
     for (var name in all)
@@ -16343,6 +16348,7 @@
   function renderPracticeFrame() {
     const root = document.getElementById("practice-engine-root");
     if (!root) return;
+    const isSpeakingDisabled = localStorage.getItem("academy_speaking_disabled") === "true";
     root.innerHTML = `
     <div class="practice-layout">
       <!-- Skill Tabs Selector (Strictly English UI) -->
@@ -16353,12 +16359,14 @@
           </span>
           <span>Listening</span>
         </button>
+        ${isSpeakingDisabled ? "" : `
         <button class="practice-menu-btn ${currentSkill === "speaking" ? "active" : ""}" onclick="window.changeSkill('speaking')">
           <span class="skill-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"></path></svg>
           </span>
           <span>Speaking</span>
         </button>
+        `}
         <button class="practice-menu-btn ${currentSkill === "reading" ? "active" : ""}" onclick="window.changeSkill('reading')">
           <span class="skill-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
@@ -16375,7 +16383,7 @@
 
       <!-- Skill Panels Container -->
       <div id="listening-panel" class="practice-panel ${currentSkill === "listening" ? "active" : ""}"></div>
-      <div id="speaking-panel" class="practice-panel ${currentSkill === "speaking" ? "active" : ""}"></div>
+      ${isSpeakingDisabled ? "" : '<div id="speaking-panel" class="practice-panel ' + (currentSkill === "speaking" ? "active" : "") + '"></div>'}
       <div id="reading-panel" class="practice-panel ${currentSkill === "reading" ? "active" : ""}"></div>
       <div id="writing-panel" class="practice-panel ${currentSkill === "writing" ? "active" : ""}"></div>
     </div>
@@ -16490,7 +16498,11 @@
       listeningIndex++;
       renderListeningExercise();
     } else {
-      window.changeSkill("speaking");
+      if (localStorage.getItem("academy_speaking_disabled") === "true") {
+        window.changeSkill("reading");
+      } else {
+        window.changeSkill("speaking");
+      }
     }
   };
   window.prevListening = function() {
@@ -17213,7 +17225,34 @@
   var onCompleteCallback = null;
   var onExitCallback = null;
   function startSession(questions, options) {
-    sessionQuestions = questions;
+    const isSpeakingDisabled = localStorage.getItem("academy_speaking_disabled") === "true";
+    let processedQuestions = questions;
+    if (isSpeakingDisabled) {
+      processedQuestions = questions.map((q) => {
+        if (q.type === "vocab" && q.vocabMode === "speaking") {
+          return {
+            ...q,
+            vocabMode: "spelling"
+          };
+        }
+        if (q.type === "skill" && q.skillType === "speaking") {
+          const lessonId = q.lessonId;
+          const lesson = levelData && levelData.curriculum ? levelData.curriculum.find((l) => l.id === lessonId) : null;
+          if (lesson && lesson.vocabulary && lesson.vocabulary.length > 0) {
+            const randVocab = lesson.vocabulary[Math.floor(Math.random() * lesson.vocabulary.length)];
+            return {
+              type: "vocab",
+              vocabMode: "spelling",
+              lessonId: q.lessonId,
+              lessonTitle: q.lessonTitle,
+              data: randVocab
+            };
+          }
+        }
+        return q;
+      });
+    }
+    sessionQuestions = processedQuestions;
     sessionIndex = 0;
     sessionScore = 0;
     sessionMode = options.mode || "review";
@@ -17710,6 +17749,19 @@
     const q = sessionQuestions[sessionIndex];
     const feedbackBox = document.getElementById("session-tutor-feedback");
     if (!feedbackBox) return;
+    if (q.type === "skill" && q.skillType === "speaking") {
+      const inputEl = document.getElementById("session-speaking-fallback-input");
+      if (!inputEl) return;
+      const val = inputEl.value.trim().toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+      const ans = q.data.text.trim().toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+      if (val === ans) {
+        handleCorrectAnswer(feedbackBox, inputEl);
+      } else {
+        const hint = getSentenceSpellingFeedback2(inputEl.value.trim(), q.data.text);
+        handleIncorrectAnswer(feedbackBox, hint, inputEl);
+      }
+      return;
+    }
     const isBlank = !q.data.correct;
     if (isBlank) {
       const inputEl = document.getElementById("session-blank-input");
@@ -17758,7 +17810,11 @@
     const targetPhrase = q.data.word || q.data.text;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      statusTxt.innerText = "Speech Recognition not supported in this browser. Please type spelling/use fallback.";
+      statusTxt.innerText = "Speech Recognition not supported. Please use typing fallback below.";
+      const vocabFallbackDiv = document.getElementById("session-vocab-fallback-typing-div");
+      if (vocabFallbackDiv) vocabFallbackDiv.classList.remove("review-hidden");
+      const speakingFallbackDiv = document.getElementById("session-fallback-typing-div");
+      if (speakingFallbackDiv) speakingFallbackDiv.classList.remove("review-hidden");
       return;
     }
     if (isRecording2) {
@@ -17782,7 +17838,15 @@
       };
       recognition2.onerror = function(event) {
         console.error(event.error);
-        statusTxt.innerText = "Error: " + event.error + ". Try alternative input!";
+        if (event.error === "not-allowed") {
+          statusTxt.innerText = "Mic blocked. Please allow mic permission or use typing fallback below.";
+        } else {
+          statusTxt.innerText = "Error: " + event.error + ". Try typing fallback below!";
+        }
+        const vocabFallbackDiv = document.getElementById("session-vocab-fallback-typing-div");
+        if (vocabFallbackDiv) vocabFallbackDiv.classList.remove("review-hidden");
+        const speakingFallbackDiv = document.getElementById("session-fallback-typing-div");
+        if (speakingFallbackDiv) speakingFallbackDiv.classList.remove("review-hidden");
         isRecording2 = false;
         micBtn.classList.remove("recording");
         if (waves) waves.classList.remove("active");
@@ -18739,7 +18803,10 @@
     const targetWord = v.word;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      statusTxt.innerText = "Mic recognition not supported. Click keyboard fallback!";
+      statusTxt.innerText = "Mic recognition not supported. Switching to spelling...";
+      setTimeout(() => {
+        window.vocabSkipSpeaking();
+      }, 1500);
       return;
     }
     if (isRecording3) {
@@ -18764,13 +18831,16 @@
       recognition3.onerror = function(event) {
         console.error(event.error);
         if (event.error === "not-allowed") {
-          statusTxt.innerText = "Mic blocked. Please allow mic permission in settings.";
+          statusTxt.innerText = "Mic blocked. Switching to spelling...";
         } else {
-          statusTxt.innerText = "Error: " + event.error + ". Try typing fallback!";
+          statusTxt.innerText = "Error: " + event.error + ". Switching to spelling...";
         }
         isRecording3 = false;
         micBtn.classList.remove("recording");
         if (waves) waves.classList.remove("active");
+        setTimeout(() => {
+          window.vocabSkipSpeaking();
+        }, 1500);
       };
       recognition3.onend = function() {
         isRecording3 = false;
@@ -19670,6 +19740,7 @@
     initLevelSelection();
     initSpeechRate();
     initSFXOption();
+    initSpeakingOption();
     initThemeOption();
     initBackupAndRestore();
     initResetOption();
@@ -19690,6 +19761,11 @@
     if (sfxBtn) {
       const enabled = localStorage.getItem("academy_sfx_enabled") !== "false";
       updateSFXButtonUI(sfxBtn, enabled);
+    }
+    const speakingBtn = document.getElementById("settings-speaking-toggle");
+    if (speakingBtn) {
+      const disabled = localStorage.getItem("academy_speaking_disabled") === "true";
+      updateSpeakingButtonUI(speakingBtn, !disabled);
     }
     const themeBtn = document.getElementById("settings-theme-toggle");
     if (themeBtn) {
@@ -19742,6 +19818,27 @@
       btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg> <span>SFX: On</span>`;
     } else {
       btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg> <span>SFX: Off</span>`;
+    }
+  }
+  function initSpeakingOption() {
+    const btn = document.getElementById("settings-speaking-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      let disabled = localStorage.getItem("academy_speaking_disabled") === "true";
+      disabled = !disabled;
+      localStorage.setItem("academy_speaking_disabled", disabled ? "true" : "false");
+      updateSpeakingButtonUI(btn, !disabled);
+    });
+  }
+  function updateSpeakingButtonUI(btn, enabled) {
+    if (enabled) {
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"></path></svg> <span>Speaking: On</span>`;
+      btn.style.borderColor = "var(--border-color)";
+      btn.style.color = "var(--text-main)";
+    } else {
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"></path><path d="M17 11.5a6 6 0 0 1-4 5.5v2.5M8 23h8M19 10.5v1a7 7 0 0 1-1.33 4.12"></path></svg> <span>Speaking: Off</span>`;
+      btn.style.borderColor = "var(--error)";
+      btn.style.color = "var(--error)";
     }
   }
   function initThemeOption() {

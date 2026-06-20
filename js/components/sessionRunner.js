@@ -8,6 +8,7 @@
 import { sfx } from '../audioEffects.js';
 import { speakText } from './lessonViewer.js';
 import { addXP } from '../storage.js';
+import { levelData } from '../levelManager.js';
 
 let sessionQuestions = [];
 let sessionIndex = 0;
@@ -31,7 +32,39 @@ let onExitCallback = null;
  * Initializes and starts a new session
  */
 export function startSession(questions, options) {
-  sessionQuestions = questions;
+  // Apply speaking disabled configuration
+  const isSpeakingDisabled = localStorage.getItem("academy_speaking_disabled") === "true";
+  let processedQuestions = questions;
+  if (isSpeakingDisabled) {
+    processedQuestions = questions.map(q => {
+      // 1. Convert vocab speaking to spelling
+      if (q.type === 'vocab' && q.vocabMode === 'speaking') {
+        return {
+          ...q,
+          vocabMode: 'spelling'
+        };
+      }
+      // 2. Convert speaking skill questions to vocab spelling questions from the same lesson
+      if (q.type === 'skill' && q.skillType === 'speaking') {
+        const lessonId = q.lessonId;
+        const lesson = levelData && levelData.curriculum ? levelData.curriculum.find(l => l.id === lessonId) : null;
+        if (lesson && lesson.vocabulary && lesson.vocabulary.length > 0) {
+          // Choose a random vocab from the lesson
+          const randVocab = lesson.vocabulary[Math.floor(Math.random() * lesson.vocabulary.length)];
+          return {
+            type: 'vocab',
+            vocabMode: 'spelling',
+            lessonId: q.lessonId,
+            lessonTitle: q.lessonTitle,
+            data: randVocab
+          };
+        }
+      }
+      return q;
+    });
+  }
+
+  sessionQuestions = processedQuestions;
   sessionIndex = 0;
   sessionScore = 0;
   sessionMode = options.mode || 'review';
@@ -604,6 +637,22 @@ function checkWritingAnswer() {
   const feedbackBox = document.getElementById("session-tutor-feedback");
   if (!feedbackBox) return;
 
+  // Check if this is a speaking skill question with typing fallback active
+  if (q.type === 'skill' && q.skillType === 'speaking') {
+    const inputEl = document.getElementById("session-speaking-fallback-input");
+    if (!inputEl) return;
+    const val = inputEl.value.trim().toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+    const ans = q.data.text.trim().toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+    
+    if (val === ans) {
+      handleCorrectAnswer(feedbackBox, inputEl);
+    } else {
+      const hint = getSentenceSpellingFeedback(inputEl.value.trim(), q.data.text);
+      handleIncorrectAnswer(feedbackBox, hint, inputEl);
+    }
+    return;
+  }
+
   const isBlank = !q.data.correct;
   
   if (isBlank) {
@@ -668,7 +717,11 @@ function toggleSpeechRecognition() {
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    statusTxt.innerText = "Speech Recognition not supported in this browser. Please type spelling/use fallback.";
+    statusTxt.innerText = "Speech Recognition not supported. Please use typing fallback below.";
+    const vocabFallbackDiv = document.getElementById('session-vocab-fallback-typing-div');
+    if (vocabFallbackDiv) vocabFallbackDiv.classList.remove('review-hidden');
+    const speakingFallbackDiv = document.getElementById('session-fallback-typing-div');
+    if (speakingFallbackDiv) speakingFallbackDiv.classList.remove('review-hidden');
     return;
   }
 
@@ -696,7 +749,16 @@ function toggleSpeechRecognition() {
 
     recognition.onerror = function(event) {
       console.error(event.error);
-      statusTxt.innerText = "Error: " + event.error + ". Try alternative input!";
+      if (event.error === 'not-allowed') {
+        statusTxt.innerText = "Mic blocked. Please allow mic permission or use typing fallback below.";
+      } else {
+        statusTxt.innerText = "Error: " + event.error + ". Try typing fallback below!";
+      }
+      const vocabFallbackDiv = document.getElementById('session-vocab-fallback-typing-div');
+      if (vocabFallbackDiv) vocabFallbackDiv.classList.remove('review-hidden');
+      const speakingFallbackDiv = document.getElementById('session-fallback-typing-div');
+      if (speakingFallbackDiv) speakingFallbackDiv.classList.remove('review-hidden');
+
       isRecording = false;
       micBtn.classList.remove('recording');
       if (waves) waves.classList.remove('active');

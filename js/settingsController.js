@@ -40,6 +40,7 @@ export function initSettingsController() {
   initLevelSelection();
   initSpeechRate();
   initSFXOption();
+  initSpeakingOption();
   initThemeOption();
   initBackupAndRestore();
   initResetOption();
@@ -69,6 +70,13 @@ function syncSettingsUI() {
   if (sfxBtn) {
     const enabled = localStorage.getItem("academy_sfx_enabled") !== "false";
     updateSFXButtonUI(sfxBtn, enabled);
+  }
+
+  // Sync Speaking Button
+  const speakingBtn = document.getElementById("settings-speaking-toggle");
+  if (speakingBtn) {
+    const disabled = localStorage.getItem("academy_speaking_disabled") === "true";
+    updateSpeakingButtonUI(speakingBtn, !disabled);
   }
 
   // Sync Theme Button
@@ -148,6 +156,33 @@ function updateSFXButtonUI(btn, enabled) {
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg> <span>SFX: On</span>`;
   } else {
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg> <span>SFX: Off</span>`;
+  }
+}
+
+/**
+ * Speaking & Microphone Questions Option
+ */
+function initSpeakingOption() {
+  const btn = document.getElementById("settings-speaking-toggle");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    let disabled = localStorage.getItem("academy_speaking_disabled") === "true";
+    disabled = !disabled;
+    localStorage.setItem("academy_speaking_disabled", disabled ? "true" : "false");
+    updateSpeakingButtonUI(btn, !disabled);
+  });
+}
+
+function updateSpeakingButtonUI(btn, enabled) {
+  if (enabled) {
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"></path></svg> <span>Speaking: On</span>`;
+    btn.style.borderColor = "var(--border-color)";
+    btn.style.color = "var(--text-main)";
+  } else {
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sidebar-btn-icon"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"></path><path d="M17 11.5a6 6 0 0 1-4 5.5v2.5M8 23h8M19 10.5v1a7 7 0 0 1-1.33 4.12"></path></svg> <span>Speaking: Off</span>`;
+    btn.style.borderColor = "var(--error)";
+    btn.style.color = "var(--error)";
   }
 }
 

@@ -497,7 +497,10 @@ function toggleVocabSpeechRecognition() {
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    statusTxt.innerText = "Mic recognition not supported. Click keyboard fallback!";
+    statusTxt.innerText = "Mic recognition not supported. Switching to spelling...";
+    setTimeout(() => {
+      window.vocabSkipSpeaking();
+    }, 1500);
     return;
   }
 
@@ -526,13 +529,17 @@ function toggleVocabSpeechRecognition() {
     recognition.onerror = function(event) {
       console.error(event.error);
       if (event.error === 'not-allowed') {
-        statusTxt.innerText = "Mic blocked. Please allow mic permission in settings.";
+        statusTxt.innerText = "Mic blocked. Switching to spelling...";
       } else {
-        statusTxt.innerText = "Error: " + event.error + ". Try typing fallback!";
+        statusTxt.innerText = "Error: " + event.error + ". Switching to spelling...";
       }
       isRecording = false;
       micBtn.classList.remove('recording');
       if (waves) waves.classList.remove('active');
+
+      setTimeout(() => {
+        window.vocabSkipSpeaking();
+      }, 1500);
     };
 
     recognition.onend = function() {

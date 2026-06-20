@@ -57,6 +57,8 @@ function renderPracticeFrame() {
   const root = document.getElementById("practice-engine-root");
   if (!root) return;
 
+  const isSpeakingDisabled = localStorage.getItem("academy_speaking_disabled") === "true";
+  
   root.innerHTML = `
     <div class="practice-layout">
       <!-- Skill Tabs Selector (Strictly English UI) -->
@@ -67,12 +69,14 @@ function renderPracticeFrame() {
           </span>
           <span>Listening</span>
         </button>
+        ${isSpeakingDisabled ? '' : `
         <button class="practice-menu-btn ${currentSkill === 'speaking' ? 'active' : ''}" onclick="window.changeSkill('speaking')">
           <span class="skill-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"></path></svg>
           </span>
           <span>Speaking</span>
         </button>
+        `}
         <button class="practice-menu-btn ${currentSkill === 'reading' ? 'active' : ''}" onclick="window.changeSkill('reading')">
           <span class="skill-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
@@ -89,7 +93,7 @@ function renderPracticeFrame() {
 
       <!-- Skill Panels Container -->
       <div id="listening-panel" class="practice-panel ${currentSkill === 'listening' ? 'active' : ''}"></div>
-      <div id="speaking-panel" class="practice-panel ${currentSkill === 'speaking' ? 'active' : ''}"></div>
+      ${isSpeakingDisabled ? '' : '<div id="speaking-panel" class="practice-panel ' + (currentSkill === 'speaking' ? 'active' : '') + '"></div>'}
       <div id="reading-panel" class="practice-panel ${currentSkill === 'reading' ? 'active' : ''}"></div>
       <div id="writing-panel" class="practice-panel ${currentSkill === 'writing' ? 'active' : ''}"></div>
     </div>
@@ -223,7 +227,11 @@ window.nextListening = function() {
     listeningIndex++;
     renderListeningExercise();
   } else {
-    window.changeSkill('speaking');
+    if (localStorage.getItem("academy_speaking_disabled") === "true") {
+      window.changeSkill('reading');
+    } else {
+      window.changeSkill('speaking');
+    }
   }
 };
 
