@@ -386,66 +386,31 @@ function renderSkillCard(q, container) {
   } 
   
   else if (q.skillType === 'writing') {
-    const isBlank = !ex.correct; // if correct list exists, it is Sentence Writer, otherwise fill blank
+    // All writing questions are now Fill in the Blank
+    const parts = ex.prompt.split(':');
+    const instruction = parts[0].trim();
+    const sentence = parts.length > 1 ? parts.slice(1).join(':').trim() : ex.prompt;
     
-    if (isBlank) {
-      // Fill-in-the-blanks style
-      const parts = ex.prompt.split(':');
-      const instruction = parts[0].trim();
-      const sentence = parts.length > 1 ? parts.slice(1).join(':').trim() : ex.prompt;
-      
-      const inputHtml = `<input type="text" id="session-blank-input" class="speaking-fallback-input practice-blank-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="..." oninput="if(this.value.toLowerCase().trim()=== '${ex.answer.toLowerCase()}') window.checkWritingSession()">`;
-      const sentenceHtml = sentence.includes('___') ? sentence.replace('___', inputHtml) : sentence + ' ' + inputHtml;
+    const inputHtml = `<input type="text" id="session-blank-input" class="speaking-fallback-input practice-blank-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="..." oninput="if(this.value.toLowerCase().trim()=== '${(ex.answer || '').toLowerCase()}') window.checkWritingSession()">`;
+    const sentenceHtml = sentence.includes('___') ? sentence.replace('___', inputHtml) : sentence + ' ' + inputHtml;
 
-      container.innerHTML = `
-        <div style="text-align: center;">
-          <div class="badge badge-accent vocab-badge-step" style="margin-bottom: 12px;">Writing: Fill in the Blank</div>
-          <h4 style="font-size: 1rem; color: var(--text-muted);">${instruction}</h4>
-          
-          <div class="practice-blank-sentence-display" style="margin: 24px 0;">
-            ${sentenceHtml}
-          </div>
+    container.innerHTML = `
+      <div style="text-align: center;">
+        <div class="badge badge-accent vocab-badge-step" style="margin-bottom: 12px;">Writing: Fill in the Blank</div>
+        <h4 style="font-size: 1rem; color: var(--text-muted);">${instruction}</h4>
+        
+        <div class="practice-blank-sentence-display" style="margin: 24px 0;">
+          ${sentenceHtml}
         </div>
-      `;
-      actionBtn.onclick = () => window.checkWritingSession();
-      actionBtn.disabled = false;
-      
-      setTimeout(() => {
-        const input = document.getElementById("session-blank-input");
-        if (input) input.focus();
-      }, 100);
-    } else {
-      // Sentence Writer style
-      const correctSentence = ex.correct.join(' ');
-      
-      container.innerHTML = `
-        <div style="text-align: center;">
-          <div class="badge badge-accent vocab-badge-step" style="margin-bottom: 12px;">Writing: Sentence Translator</div>
-          <h4 style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 16px;">${ex.prompt}</h4>
-          
-          <!-- Slots display -->
-          <div class="sentence-slots-container" id="session-slots-tray" style="margin: 0 auto 16px auto;">
-            ${generateSentenceSlots(typedSentence, correctSentence)}
-          </div>
-
-          <!-- Input box -->
-          <input type="text" id="session-sentence-input" class="speaking-fallback-input practice-sentence-input" 
-                 placeholder="Type the sentence in English here..." autocomplete="off" 
-                 autocorrect="off" autocapitalize="off" spellcheck="false"
-                 value="${typedSentence.replace(/"/g, '&quot;')}"
-                 style="margin: 0 auto;"
-                 oninput="window.sessionOnWritingInput(this.value)"
-                 onkeydown="if(event.key==='Enter' && !window.answered) window.checkWritingSession()">
-        </div>
-      `;
-      actionBtn.onclick = () => window.checkWritingSession();
-      actionBtn.disabled = false;
-
-      setTimeout(() => {
-        const input = document.getElementById("session-sentence-input");
-        if (input) input.focus();
-      }, 100);
-    }
+      </div>
+    `;
+    actionBtn.onclick = () => window.checkWritingSession();
+    actionBtn.disabled = false;
+    
+    setTimeout(() => {
+      const input = document.getElementById("session-blank-input");
+      if (input) input.focus();
+    }, 100);
   }
 }
 
@@ -653,33 +618,16 @@ function checkWritingAnswer() {
     return;
   }
 
-  const isBlank = !q.data.correct;
+  // All writing questions are now Fill in the Blank
+  const inputEl = document.getElementById("session-blank-input");
+  if (!inputEl) return;
+  const val = inputEl.value.trim().toLowerCase();
+  const ans = (q.data.answer || '').toLowerCase();
   
-  if (isBlank) {
-    const inputEl = document.getElementById("session-blank-input");
-    if (!inputEl) return;
-    const val = inputEl.value.trim().toLowerCase();
-    const ans = q.data.answer.toLowerCase();
-    
-    if (val === ans) {
-      handleCorrectAnswer(feedbackBox, inputEl);
-    } else {
-      handleIncorrectAnswer(feedbackBox, `الكلمة غير صحيحة. الخيار المناسب هو: "${q.data.answer}"`, inputEl);
-    }
+  if (val === ans) {
+    handleCorrectAnswer(feedbackBox, inputEl);
   } else {
-    // Sentence Writer check
-    const inputEl = document.getElementById("session-sentence-input");
-    const correctSentence = q.data.correct.join(' ');
-    
-    const targetClean = correctSentence.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-    const inputClean = typedSentence.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-
-    if (inputClean === targetClean) {
-      handleCorrectAnswer(feedbackBox, inputEl);
-    } else {
-      const hint = getSentenceSpellingFeedback(typedSentence, correctSentence);
-      handleIncorrectAnswer(feedbackBox, hint, inputEl);
-    }
+    handleIncorrectAnswer(feedbackBox, `الكلمة غير صحيحة. الخيار المناسب هو: "${q.data.answer}"`, inputEl);
   }
 }
 

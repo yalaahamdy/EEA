@@ -155,42 +155,32 @@ export function getLessonExercises(lesson, skill) {
   
   else if (skill === 'writing') {
     if (lesson.practice && lesson.practice.writing) {
-      list = [...lesson.practice.writing];
+      // Include only fill-in-the-blank questions (those with an 'answer' field)
+      list = lesson.practice.writing.filter(ex => ex.answer && !ex.correct);
     }
     
     if (list.length < 10) {
       const vocabList = shuffle(lesson.vocabulary);
       for (let i = 0; i < vocabList.length && list.length < 10; i++) {
         const v = vocabList[i];
+        if (!v.example) continue;
         
-        // Let's generate a mixture of fill-in-the-blank and sentence writing
-        if (Math.random() > 0.5 && v.example) {
-          // Fill-in-the-blank
-          const lowercaseWord = v.word.toLowerCase();
-          const cleanEx = v.example.replace(/[^\w\s']/g, ''); // strip punctuation
-          const words = cleanEx.split(/\s+/);
-          const foundIdx = words.findIndex(w => w.toLowerCase() === lowercaseWord);
-          
-          if (foundIdx !== -1) {
-            const blankedSentence = v.example.replace(new RegExp(`\\b${v.word}\\b`, 'i'), '___');
-            const dists = getVocabDistractors(v.word, lesson, 2);
-            list.push({
-              prompt: `أكمل الجملة: ${v.exampleTranslation} : ${blankedSentence}`,
-              placeholder: shuffle([v.word, ...dists]).join(' / '),
-              answer: v.word
-            });
-            continue;
-          }
-        }
+        // Always use Fill-in-the-blank (never Sentence Writer)
+        const lowercaseWord = v.word.toLowerCase();
+        const cleanEx = v.example.replace(/[^\w\s']/g, '');
+        const words = cleanEx.split(/\s+/);
+        const foundIdx = words.findIndex(w => w.toLowerCase() === lowercaseWord);
         
-        // Sentence Writer (or fallback)
-        if (v.example && v.exampleTranslation) {
+        if (foundIdx !== -1) {
+          const blankedSentence = v.example.replace(new RegExp(`\\b${v.word}\\b`, 'i'), '___');
+          const dists = getVocabDistractors(v.word, lesson, 2);
           list.push({
-            prompt: v.exampleTranslation,
-            correct: cleanSentenceWords(v.example)
+            prompt: `أكمل الجملة: ${v.exampleTranslation || v.translation} : ${blankedSentence}`,
+            placeholder: shuffle([v.word, ...dists]).join(' / '),
+            answer: v.word
           });
         } else {
-          // Fallback simple writing
+          // Fallback: simple word fill blank
           const dists = getVocabDistractors(v.word, lesson, 2);
           list.push({
             prompt: `اكتب الكلمة الناقصة: كيف تقول "${v.translation}" بالإنجليزية؟`,

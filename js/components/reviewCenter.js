@@ -327,7 +327,7 @@ function runReviewSession() {
     containerId: 'review-center-section',
     onComplete: (score, total) => {
       const xpEarned = score * 10;
-      renderCompletionScreen(xpEarned, total);
+      renderCompletionScreen(xpEarned, total, score);
     },
     onExit: () => {
       window.location.hash = '#dashboard';
@@ -335,40 +335,84 @@ function runReviewSession() {
   });
 }
 
-function renderCompletionScreen(xpEarned, totalCount) {
+function renderCompletionScreen(xpEarned, totalCount, score) {
   sfx.playCelebration();
   addXP(xpEarned);
 
   const container = document.getElementById("review-center-section");
   if (!container) return;
 
+  const pct = totalCount > 0 ? Math.round((score / totalCount) * 100) : 0;
+  const wrongCount = totalCount - score;
+
+  // Determine performance tier
+  let tierColor = 'var(--error)';
+  let tierLabel = 'Needs Practice';
+  let tierAr = 'ذاكر أكتر يا بطل!';
+  let svgDashOffset = Math.round(283 * (1 - pct / 100));
+
+  if (pct >= 85) {
+    tierColor = 'var(--success)';
+    tierLabel = 'Excellent!';
+    tierAr = 'الله ينور يا بطل! مراجعتك ممتازة جداً!';
+  } else if (pct >= 60) {
+    tierColor = 'var(--warning, #f59e0b)';
+    tierLabel = 'Good Progress';
+    tierAr = 'كويس يا بطل! في شوية غلطات راجع عليها!';
+  }
+
   container.innerHTML = `
     <div class="section-header">
-      <h1 class="section-title">Smart Daily Review</h1>
-      <p class="section-subtitle">Review complete. Memory refreshed!</p>
+      <h1 class="section-title">Daily Review Complete</h1>
+      <p class="section-subtitle">Your performance summary for this session</p>
     </div>
 
-    <div class="review-complete-deck">
-      <div class="review-complete-icon">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="review-complete-svg"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path><path d="M12 2a6 6 0 0 1 6 6v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8a6 6 0 0 1 6-6z"></path></svg>
-      </div>
-      <h2 class="review-complete-title">Daily Review Completed!</h2>
-      
-      <div class="tutor-arabic-card review-complete-arabic">
-        <p class="ar-text">
-          الله ينور يا بطل! راجعت الكلمات والمهارات القديمة بنجاح ورشّيت مية على الدروس عشان ماتنساهاش أبداً. كسبت **${xpEarned} نقطة XP** إضافية للنهاردة!
-        </p>
+    <div class="quiz-results-card" style="max-width: 520px; margin: 0 auto;">
+
+      <!-- Circular score SVG -->
+      <div class="results-icon" style="margin-bottom: 8px; position: relative; display: inline-block;">
+        <svg width="110" height="110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="45" stroke="${tierColor}" stroke-width="3" fill="none" opacity="0.12"/>
+          <circle cx="50" cy="50" r="45" stroke="${tierColor}" stroke-width="5" fill="none"
+            stroke-dasharray="283" stroke-dashoffset="${svgDashOffset}" stroke-linecap="round"
+            transform="rotate(-90 50 50)"/>
+          <text x="50" y="45" text-anchor="middle" fill="${tierColor}" font-size="20" font-weight="700" font-family="Outfit, sans-serif">${pct}%</text>
+          <text x="50" y="61" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="Outfit, sans-serif">ACCURACY</text>
+        </svg>
       </div>
 
-      <div class="review-complete-stats">
-        <span>Questions Answered: <strong>${totalCount}</strong></span> | 
-        <span>XP Earned: <strong class="review-xp-highlight">+${xpEarned}</strong></span>
+      <h2 style="font-size: 1.4rem; font-weight: 700; color: ${tierColor}; margin: 4px 0 12px;">${tierLabel}</h2>
+
+      <!-- Stats row -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 20px; text-align: center;">
+        <div style="background: var(--bg-tertiary); border-radius: 10px; padding: 12px 8px; border: 1px solid var(--border-color);">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${totalCount}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Total</div>
+        </div>
+        <div style="background: var(--bg-tertiary); border-radius: 10px; padding: 12px 8px; border: 1px solid rgba(34,197,94,0.3);">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${score}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Correct</div>
+        </div>
+        <div style="background: var(--bg-tertiary); border-radius: 10px; padding: 12px 8px; border: 1px solid rgba(239,68,68,0.3);">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--error);">${wrongCount}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Wrong</div>
+        </div>
+      </div>
+
+      <!-- XP gained badge -->
+      <div style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 20px; padding: 6px 18px; color: white; font-weight: 700; font-size: 0.95rem; margin-bottom: 16px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        +${xpEarned} XP Earned
+      </div>
+
+      <div class="tutor-arabic-card review-complete-arabic" style="margin-bottom: 20px;">
+        <p class="ar-text">${tierAr}</p>
       </div>
 
       <div class="review-complete-actions">
         <button class="btn btn-primary btn-next-svg-adjust" onclick="window.startNewReviewSession()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-          <span>Start New Review Session</span>
+          <span>New Review Session</span>
         </button>
         <a href="#roadmap" class="btn btn-secondary btn-next-svg-adjust">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon-left"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>

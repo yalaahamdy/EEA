@@ -624,12 +624,7 @@ function renderWritingExercise() {
   }
 
   const ex = exercises[writingIndex];
-
-  if (ex.words || ex.correct) {
-    renderScrambleWriting(ex, panel, exercises.length);
-  } else {
-    renderFillBlanksWriting(ex, panel, exercises.length);
-  }
+  renderFillBlanksWriting(ex, panel, exercises.length);
 }
 
 function generateSentenceSlots(typedText, correctSentence) {
@@ -1008,7 +1003,11 @@ function showPracticeFinishedCard() {
   panel.innerHTML = `
     <div class="quiz-results-card">
       <div class="results-icon">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path><path d="M12 2a6 6 0 0 1 6 6v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8a6 6 0 0 1 6-6z"></path></svg>
+        <svg width="80" height="80" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="45" stroke="var(--success)" stroke-width="4" fill="none" opacity="0.15"/>
+          <circle cx="50" cy="50" r="45" stroke="var(--success)" stroke-width="4" fill="none" stroke-dasharray="283" stroke-dashoffset="70" stroke-linecap="round" transform="rotate(-90 50 50)"/>
+          <path d="M30 50 L44 64 L70 38" stroke="var(--success)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
       </div>
       <h2 class="practice-finished-title">Practice Complete!</h2>
       

@@ -48,7 +48,13 @@ function showQuizResults(score, total) {
 
   if (passed) {
     sfx.playCelebration();
-    icon = `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path><path d="M12 2a6 6 0 0 1 6 6v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8a6 6 0 0 1 6-6z"></path></svg>`;
+    icon = `<svg width="88" height="88" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="44" stroke="var(--success)" stroke-width="3" fill="none" opacity="0.12"/>
+      <circle cx="50" cy="50" r="44" stroke="var(--success)" stroke-width="4.5" fill="none"
+        stroke-dasharray="276" stroke-dashoffset="0" stroke-linecap="round"
+        transform="rotate(-90 50 50)" style="animation: dash-in 0.8s ease forwards;"/>
+      <path d="M28 50 L43 65 L72 35" stroke="var(--success)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>`;
     feedbackText = `
       <h3 class="quiz-results-title-passed">Congratulations! You Passed!</h3>
       <div class="tutor-arabic-card quiz-results-tutor-card">
@@ -69,7 +75,14 @@ function showQuizResults(score, total) {
     `;
   } else {
     sfx.playIncorrect();
-    icon = `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+    icon = `<svg width="88" height="88" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="44" stroke="var(--error)" stroke-width="3" fill="none" opacity="0.12"/>
+      <circle cx="50" cy="50" r="44" stroke="var(--error)" stroke-width="4.5" fill="none"
+        stroke-dasharray="276" stroke-dashoffset="${Math.round(276 * (1 - score/total))}" stroke-linecap="round"
+        transform="rotate(-90 50 50)"/>
+      <line x1="34" y1="34" x2="66" y2="66" stroke="var(--error)" stroke-width="6.5" stroke-linecap="round"/>
+      <line x1="66" y1="34" x2="34" y2="66" stroke="var(--error)" stroke-width="6.5" stroke-linecap="round"/>
+    </svg>`;
     feedbackText = `
       <h3 class="quiz-results-title-failed">Quiz Failed. Keep Learning!</h3>
       <div class="tutor-arabic-card quiz-results-tutor-card">
@@ -91,12 +104,14 @@ function showQuizResults(score, total) {
   }
 
   const xpGained = passed ? "XP +150" : "XP +30";
+  const scorePercent = Math.round((score / total) * 100);
 
   root.innerHTML = `
     <div class="quiz-results-card">
       <div class="results-icon">${icon}</div>
       <div class="results-grade">${score} / ${total}</div>
       <div class="results-xp">${xpGained}</div>
+      <div style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 4px;">${scorePercent}% Accuracy</div>
       <div class="results-comment">${feedbackText}</div>
       <div class="quiz-results-actions">
         ${actions}
